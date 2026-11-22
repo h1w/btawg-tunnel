@@ -27,7 +27,9 @@ func (u Unit) logs() (*Screen, error) {
 	}
 	var log struct {
 		Events []struct {
-			Time string   `xml:"System>TimeCreated>SystemTime,attr"`
+			Created struct {
+				Time string `xml:"SystemTime,attr"`
+			} `xml:"System>TimeCreated"`
 			Data []string `xml:"EventData>Data"`
 		} `xml:"Event"`
 	}
@@ -39,8 +41,8 @@ func (u Unit) logs() (*Screen, error) {
 	var text strings.Builder
 	for i := len(log.Events) - 1; i >= 0; i-- {
 		e := log.Events[i]
-		if e.Time != "" {
-			text.WriteString(e.Time)
+		if e.Created.Time != "" {
+			text.WriteString(e.Created.Time)
 			text.WriteByte(' ')
 		}
 		text.WriteString(strings.TrimSpace(strings.Join(e.Data, " ")))

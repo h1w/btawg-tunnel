@@ -32,6 +32,7 @@ type ControlRequest struct {
 type ControlResponse struct {
 	OK             bool                `json:"ok"`
 	Enabled        []string            `json:"enabled"`
+	SOCKSBasePort  int                 `json:"socks_base_port,omitempty"`
 	Balancers      map[string][]string `json:"balancers,omitempty"`
 	Credentials    *Credentials        `json:"credentials,omitempty"`
 	Routes         []RouteOption       `json:"routes,omitempty"`
@@ -46,6 +47,9 @@ type ControlResponse struct {
 	Error          string              `json:"error,omitempty"`
 }
 
+// PortBase returns the first SOCKS5 listen port, including for older daemons.
+func (r ControlResponse) PortBase() int { return socksPortBase(r.SOCKSBasePort) }
+
 // RouteID returns the saved egress for port, or the implicit hub default.
 func (r ControlResponse) RouteID(port int) string {
 	return selectedRouteID(r.SelectedRoutes, port)
@@ -59,7 +63,10 @@ type clientControl struct {
 }
 
 func RunManaged(ctx context.Context, cfg ManagedConfig, realTUN bool, tunName string, ready func() error) error {
-	return runManagedAt(ctx, cfg, ManagedConfigPath, ControlSocketPath, realTUN, tunName, ManagedPortBase, ready)
+	if err := ValidateSOCKSBasePort(cfg.PortBase()); err != nil {
+		return err
+	}
+	return runManagedAt(ctx, cfg, ManagedConfigPath, ControlSocketPath, realTUN, tunName, cfg.PortBase(), ready)
 }
 
 func runManagedAt(ctx context.Context, cfg ManagedConfig, cfgPath, socketPath string, realTUN bool, tunName string, portBase int, ready func() error) error {
@@ -218,10 +225,12 @@ func (c *ManagedConfig) update(req ControlRequest, options []RouteOption, runnin
 		}
 		c.Enabled = modes
 	case "set-route":
-		if req.Port < ManagedPortBase || req.Port >= ManagedPortBase+len(config.ClientModes())+len(balancerPolicies) {
+		offset := req.Port - c.PortBase()
+		if offset < 0 || offset >= socksPortCount() {
 			return fmt.Errorf("unknown SOCKS5 port %d", req.Port)
 		}
-		current := selectedRouteID(c.Routes, req.Port)
+		slot := ManagedPortBase + offset
+		current := selectedRouteID(c.Routes, slot)
 		if req.RouteID == "" || running && !slices.ContainsFunc(options, func(option RouteOption) bool { return option.ID == req.RouteID }) {
 			return fmt.Errorf("egress route %q is not available", req.RouteID)
 		}
@@ -232,9 +241,9 @@ func (c *ManagedConfig) update(req ControlRequest, options []RouteOption, runnin
 			routes := make(map[int]string, len(c.Routes)+1)
 			maps.Copy(routes, c.Routes)
 			if req.RouteID == HubRouteID {
-				delete(routes, req.Port)
+				delete(routes, slot)
 			} else {
-				routes[req.Port] = req.RouteID
+				routes[slot] = req.RouteID
 			}
 			c.Routes = routes
 		}
@@ -285,10 +294,18 @@ func peerRevision(p PeerSettings) string {
 
 func (c ManagedConfig) response(op string) ControlResponse {
 	r := ControlResponse{
-		OK: true, Enabled: c.Enabled, Balancers: c.Balancers, SelectedRoutes: c.Routes,
+		OK: true, Enabled: c.Enabled, SOCKSBasePort: c.PortBase(), Balancers: c.Balancers,
 		P2P: c.P2P, AutoMap: c.AutoMap, ServeEgress: c.ServeEgress,
 		PeerPort: c.PeerPort, PeerEndpoint: c.PeerEndpoint,
 		Peer: c.Peer,
+	}
+	if r.SOCKSBasePort == ManagedPortBase {
+		r.SelectedRoutes = c.Routes
+	} else if len(c.Routes) > 0 {
+		r.SelectedRoutes = make(map[int]string, len(c.Routes))
+		for slot, route := range c.Routes {
+			r.SelectedRoutes[r.SOCKSBasePort+(slot-ManagedPortBase)] = route
+		}
 	}
 	if op == "status" {
 		r.PeerRevision = peerRevision(c.Peer)

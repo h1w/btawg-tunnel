@@ -82,6 +82,29 @@ func TestEverySOCKS5PortOffersRouteAndTransportControls(t *testing.T) {
 	}
 }
 
+func TestSOCKSMenuUsesConfiguredBase(t *testing.T) {
+	status := client.ControlResponse{
+		SOCKSBasePort:  11080,
+		SelectedRoutes: map[int]string{11092: "exit"},
+		Routes:         []client.RouteOption{{ID: "exit", Name: "Exit"}},
+	}
+	actions := portActions(status, true)
+	for _, tc := range []struct {
+		offset int
+		port   string
+	}{
+		{0, "11080"}, {9, "11089"}, {10, "11090"}, {12, "11092"},
+	} {
+		screen, err := actions[tc.offset].Run()
+		if err != nil || !strings.HasPrefix(screen.Title, "SOCKS5 "+tc.port+" — ") {
+			t.Errorf("slot %d did not open the menu for port %s", tc.offset, tc.port)
+		}
+	}
+	if !strings.HasSuffix(actions[12].Label, " •  Exit") {
+		t.Fatalf("shifted balancer did not show its saved route: %q", actions[12].Label)
+	}
+}
+
 func TestParsePeerPort(t *testing.T) {
 	for _, tc := range []struct {
 		input string

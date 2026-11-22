@@ -63,6 +63,7 @@ func installMain(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
 	importFile := fs.String("import-file", "", "file containing the btawg:// import string (secret)")
 	socksListen := fs.String("socks-listen", "127.0.0.1", "SOCKS5 listen IPv4 address")
+	socksBase := fs.Int("socks-base-port", client.ManagedPortBase, "first port of the managed SOCKS5 block")
 	noTun := fs.Bool("no-tun", false, "userspace netstack mode: no OS interface")
 	tunName := fs.String("tun", "btawg0", "TUN interface name")
 	if err := fs.Parse(args); err != nil {
@@ -77,11 +78,14 @@ func installMain(args []string) error {
 	}
 	_, err := client.LoadManagedConfig(client.ManagedConfigPath)
 	if errors.Is(err, os.ErrNotExist) {
+		if err := client.ValidateSOCKSBasePort(*socksBase); err != nil {
+			return err
+		}
 		raw, err := readImport(*importFile)
 		if err != nil {
 			return err
 		}
-		if err := saveClientSettings(nil, raw, client.ManagedConfig{ListenIP: *socksListen, NoTUN: *noTun, TUNName: *tunName}); err != nil {
+		if err := saveClientSettings(nil, raw, client.ManagedConfig{ListenIP: *socksListen, SOCKSBasePort: *socksBase, NoTUN: *noTun, TUNName: *tunName}); err != nil {
 			return err
 		}
 	} else if err != nil {

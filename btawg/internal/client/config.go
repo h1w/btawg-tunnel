@@ -158,14 +158,16 @@ func (p PeerSettings) validateTransports() error {
 // ManagedConfig is the root-owned client configuration and persists across
 // upgrades and restarts.
 type ManagedConfig struct {
-	Import      string      `json:"import"`
-	Enabled     []string    `json:"enabled"`
-	ListenIP    string      `json:"listen_ip"`
-	Credentials Credentials `json:"credentials"`
-	NoTUN       bool        `json:"no_tun,omitempty"`
-	TUNName     string      `json:"tun_name,omitempty"`
+	Import        string      `json:"import"`
+	Enabled       []string    `json:"enabled"`
+	ListenIP      string      `json:"listen_ip"`
+	Credentials   Credentials `json:"credentials"`
+	NoTUN         bool        `json:"no_tun,omitempty"`
+	TUNName       string      `json:"tun_name,omitempty"`
+	SOCKSBasePort int         `json:"socks_base_port,omitempty"` // zero uses ManagedPortBase
 	// A missing balancer pool follows Enabled; an empty list routes nothing.
 	Balancers map[string][]string `json:"balancers,omitempty"`
+	// Keys are stable slot numbers (1080 + offset), independent of the listen base.
 	// Missing entries use the hub; explicit choices survive catalogue changes.
 	Routes             map[int]string `json:"routes,omitempty"`
 	P2P                bool           `json:"p2p,omitempty"`
@@ -176,6 +178,27 @@ type ManagedConfig struct {
 	PeerEndpoint       string         `json:"peer_endpoint,omitempty"`
 	PeerTCPEndpoint    string         `json:"peer_tcp_endpoint,omitempty"`
 	Peer               PeerSettings   `json:"peer"`
+}
+
+// PortBase returns the first configured SOCKS5 listen port.
+func (c ManagedConfig) PortBase() int { return socksPortBase(c.SOCKSBasePort) }
+
+func socksPortBase(base int) int {
+	if base == 0 {
+		return ManagedPortBase
+	}
+	return base
+}
+
+func socksPortCount() int { return len(config.ClientModes()) + len(balancerPolicies) }
+
+// ValidateSOCKSBasePort checks that the entire block fits in the TCP port range.
+func ValidateSOCKSBasePort(base int) error {
+	maxBase := 65536 - socksPortCount()
+	if base < 1 || base > maxBase {
+		return fmt.Errorf("SOCKS5 base port must be between 1 and %d", maxBase)
+	}
+	return nil
 }
 
 func selectedRouteID(routes map[int]string, port int) string {
@@ -223,11 +246,17 @@ func LoadManagedConfig(path string) (ManagedConfig, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return c, fmt.Errorf("parse %s: %w", path, err)
 	}
+	if err := ValidateSOCKSBasePort(c.PortBase()); err != nil {
+		return c, fmt.Errorf("parse %s: %w", path, err)
+	}
 	return c, nil
 }
 
 // Save writes the configuration atomically with root-only permissions.
 func (c ManagedConfig) Save(path string) error {
+	if err := ValidateSOCKSBasePort(c.PortBase()); err != nil {
+		return err
+	}
 	if err := c.validatePeerSettings(!c.NoTUN); err != nil {
 		return err
 	}

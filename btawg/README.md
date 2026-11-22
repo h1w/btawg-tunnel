@@ -104,16 +104,20 @@ choose **Save and install**. The installer saves the import and generated SOCKS5
 credentials under `/etc/btawg`, then enables and starts `btawg-client.service`.
 The imported mode starts enabled; other modes are reserved but off. Select a
 transport and press Enter or Space to toggle it without restarting the service.
-To edit the import, SOCKS5 listen address or TUN options, choose **Service
-settings**. Saving changes restarts the service if running. Leaving the import
-field blank keeps it. In a text field, use your terminal's paste action (e.g.
+To edit the import, SOCKS5 address or base port, or TUN options, choose
+**Service settings**. Saving changes restarts a running service. Leaving the
+import field blank keeps it. In a text field, use your terminal's paste action (e.g.
 right-click in PuTTY or the terminal menu); the TUI keeps the import hidden.
-For unattended installation, use `sudo ./btawg-client install -import-file client.txt`.
+For unattended first-time installation, use
+`sudo ./btawg-client install -import-file client.txt -socks-base-port 11080`.
 
-Each connection mode has a **fixed** local SOCKS5 port (1080 = first mode,
-1081 = second, …). Toggling a mode off closes its sessions but keeps its port
-reserved so nothing else can take it; the other ports keep working. The port
-mapping is permanent across toggles and restarts:
+The managed client reserves 13 consecutive local SOCKS5 ports on Linux and
+Windows. **SOCKS5 base port** defaults to `1080` and accepts `1–65523` (the OS
+may restrict low ports). For example, `11080` gives transports `11080–11089`
+and balancers `11090–11092`. The tables below show the default numbers.
+Toggling a mode off closes its sessions but keeps its port reserved. Changing
+the base restarts a running client and closes its SOCKS5 sessions; point local
+applications at the new ports. VPN, hub, and P2P settings are unchanged.
 
 | Port | Mode | Port | Mode |
 |---:|---|---:|---|
@@ -202,6 +206,18 @@ route. A conflicting LAN or VPN prefix is an error; fix the overlap before
 starting the real-TUN client. The TUI, SOCKS5 ports, balance pools and peer
 menus are shared with Linux. **View service logs** shows the Windows Application
 event log entries for `btawg-client`.
+
+If service startup reports a SOCKS5 bind conflict on Windows, identify the
+process listening on the reported TCP port (for example, `1080`):
+
+```powershell
+Get-NetTCPConnection -LocalPort 1080 -State Listen |
+    Select-Object LocalAddress, LocalPort, OwningProcess,
+        @{Name='Process';Expression={(Get-Process -Id $_.OwningProcess).ProcessName}}
+```
+
+Either free the port or choose a free block of 13 ports in **Service settings**
+→ **SOCKS5 base port**, then choose **Start service** if the service is stopped.
 
 The client does not change Windows Firewall. For direct connections allow
 the configured P2P TCP and UDP listeners on the network where peers can reach
@@ -453,10 +469,11 @@ open a port through an upstream NAT or the host firewall.
    intended devices. Create a named route with an exit and an optional first
    transit, then allow specific clients and/or groups. An empty audience grants
    no access. The hub's Internet setting controls only the central server exit.
-3. In the client TUI, open any SOCKS5 port (1080–1092) and choose **Egress route**.
-   The selected ID persists per port. Each new TCP connection or UDP association
-   uses that exact route; the final node resolves hostnames and opens public
-   IPv4 destinations. Ordinary host Internet traffic is unchanged.
+3. In the client TUI, open a SOCKS5 port and choose **Egress route**.
+   The selected ID follows the same transport or balancer if the port base
+   changes. Each new TCP connection or UDP association uses that route; the
+   final node resolves hostnames and opens public IPv4 destinations. Ordinary
+   host Internet traffic is unchanged.
 
 The same authorized hop may use a direct path or relay through the hub. If the
 required hop or exit fails, no other exit or country is substituted. Active

@@ -67,14 +67,22 @@ func clientSetup(install bool) (*service.Screen, error) {
 			{Label: "P2P listen port (0 = automatic)", Value: strconv.Itoa(int(cfg.PeerPort))},
 			{Label: "Public P2P UDP address (optional)", Value: cfg.PeerEndpoint},
 			{Label: "Public P2P TCP address (optional)", Value: cfg.PeerTCPEndpoint},
+			{Label: "SOCKS5 base port", Value: strconv.Itoa(cfg.PortBase())},
 		},
 		Save: func(fields []service.Field) (*service.Screen, error) {
 			port, err := parsePeerPort(fields[8].Value)
 			if err != nil {
 				return nil, err
 			}
+			base, err := strconv.Atoi(strings.TrimSpace(fields[11].Value))
+			if err != nil {
+				return nil, errors.New("SOCKS5 base port must be a number")
+			}
+			if err := client.ValidateSOCKSBasePort(base); err != nil {
+				return nil, err
+			}
 			settings := client.ManagedConfig{
-				ListenIP: fields[1].Value, TUNName: fields[2].Value, NoTUN: fields[3].Checked,
+				ListenIP: fields[1].Value, TUNName: fields[2].Value, NoTUN: fields[3].Checked, SOCKSBasePort: base,
 				P2P: fields[4].Checked, AutoMap: fields[5].Checked, AllowPermanentUPnP: fields[6].Checked, ServeEgress: fields[7].Checked,
 				PeerPort: port, PeerEndpoint: fields[9].Value,
 				PeerTCPEndpoint: fields[10].Value,
@@ -143,6 +151,7 @@ func saveClientSettings(previous *client.ManagedConfig, raw string, settings cli
 		}
 	}
 	next.ListenIP, next.TUNName, next.NoTUN = ip.String(), tun, settings.NoTUN
+	next.SOCKSBasePort = settings.SOCKSBasePort
 	next.P2P, next.AutoMap, next.ServeEgress = settings.P2P, settings.AutoMap, settings.ServeEgress
 	next.AllowPermanentUPnP = settings.AllowPermanentUPnP && settings.AutoMap
 	next.PeerPort, next.PeerEndpoint = settings.PeerPort, strings.TrimSpace(settings.PeerEndpoint)
@@ -169,8 +178,9 @@ func portActions(status client.ControlResponse, running bool) []service.Action {
 	modes := config.ClientModes()
 	policies := client.BalancerPorts()
 	actions := make([]service.Action, 0, len(modes)+len(policies)+2)
+	base := status.PortBase()
 	for i, mode := range modes {
-		port := client.ManagedPortBase + i
+		port := base + i
 		checked, state := "[ ]", "off"
 		if running {
 			state = "reserved"
@@ -204,7 +214,7 @@ func portActions(status client.ControlResponse, running bool) []service.Action {
 	}
 	labels := [...]string{"Failover", "Round-robin", "Adaptive"}
 	for i, policy := range policies {
-		port, label := client.ManagedPortBase+len(modes)+i, labels[i]
+		port, label := base+len(modes)+i, labels[i]
 		pool, custom := status.Balancers[policy]
 		if !custom {
 			pool = status.Enabled

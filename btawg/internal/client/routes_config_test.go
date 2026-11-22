@@ -60,6 +60,56 @@ func TestManagedRoutesPersistIndependently(t *testing.T) {
 	}
 }
 
+func TestManagedRoutesFollowSOCKSSlotsWhenBaseMoves(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "client.json")
+	if err := os.WriteFile(path, []byte(`{"routes":{"1080":"exit","1092":"cascade"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadManagedConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.response("status"); got.RouteID(1080) != "exit" || got.RouteID(1092) != "cascade" {
+		t.Fatal("legacy routes did not load")
+	}
+	cfg.SOCKSBasePort = 1081 // Overlap the old block: preserve offsets, not absolute ports.
+	if err := cfg.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = LoadManagedConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.response("status"); !maps.Equal(got.SelectedRoutes, map[int]string{1081: "exit", 1093: "cascade"}) {
+		t.Fatalf("routes after moving base: %v", got.SelectedRoutes)
+	}
+	if err := cfg.update(ControlRequest{Op: "set-route", Port: 1080, RouteID: HubRouteID}, nil, false); err == nil {
+		t.Fatal("accepted a port outside the new block")
+	}
+	if err := cfg.update(ControlRequest{Op: "set-route", Port: 1093, RouteID: HubRouteID}, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	cfg.SOCKSBasePort = 0
+	if got := cfg.response("status"); !maps.Equal(got.SelectedRoutes, map[int]string{1080: "exit"}) {
+		t.Fatalf("routes after resetting base: %v", got.SelectedRoutes)
+	}
+}
+
+func TestManagedSOCKSBaseFitsAllPorts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "client.json")
+	for _, tc := range []struct {
+		base int
+		ok   bool
+	}{
+		{0, true}, {1, true}, {65523, true}, {65524, false}, {-1, false},
+	} {
+		cfg := ManagedConfig{SOCKSBasePort: tc.base}
+		if err := cfg.Save(path); (err == nil) != tc.ok {
+			t.Errorf("save base %d: %v; want success=%t", tc.base, err, tc.ok)
+		}
+	}
+}
+
 func TestSetRouteUsesCurrentCatalogueAndPreservesStaleSelection(t *testing.T) {
 	cfg := ManagedConfig{Routes: map[int]string{1080: "retired", 1092: "also-retired"}}
 	options := []RouteOption{{ID: "exit", Name: "Renamed exit"}}
