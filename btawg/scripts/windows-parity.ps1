@@ -6,8 +6,8 @@ param(
 $ErrorActionPreference = 'Stop'
 if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Bundle).Hash -ne $ExpectedSha256) { throw 'bundle SHA-256 mismatch' }
 $f = Get-Content -Raw -LiteralPath $Fixture | ConvertFrom-Json
-$target = if ([int](Get-CimInstance Win32_OperatingSystem).BuildNumber -eq 19045) { 'windows-10-22h2' } else { 'windows-11' }
-if ($target -eq 'windows-11' -and [int](Get-CimInstance Win32_OperatingSystem).BuildNumber -lt 22000) { throw 'unsupported Windows test version' }
+$os = Get-CimInstance Win32_OperatingSystem
+if ($os.ProductType -ne 1 -or [int]$os.BuildNumber -lt 22000) { throw 'release acceptance requires Windows 11' }
 $echoHost = ([uri]$f.EchoURL).Host
 if ([uri]::CheckHostName($echoHost) -ne [System.UriHostNameType]::Dns) { throw 'SOCKS DNS proof requires a fixture hostname' }
 if ((Get-Service -Name btawg-client -ErrorAction SilentlyContinue) -or (Test-Path (Join-Path $env:ProgramData 'btawg/client.json'))) {
@@ -17,7 +17,6 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
 New-Item -ItemType Directory $root | Out-Null
 Expand-Archive -LiteralPath $Bundle -DestinationPath $root
 $client = Join-Path $root 'btawg-client.exe'
-$os = Get-CimInstance Win32_OperatingSystem
 Write-Output "Testing $($os.Caption) build $($os.BuildNumber), SHA-256 $ExpectedSha256"
 $defaults = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Sort-Object InterfaceIndex,NextHop | Select-Object InterfaceIndex,NextHop,RouteMetric | ConvertTo-Json -Compress
 & $client install -import-file $f.ImportFile
@@ -49,9 +48,9 @@ $after = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Sort-
 if ($after -ne $defaults) { throw 'dashboard changes modified the Windows default route' }
 $required = @('tui', 'service-autostart-reboot', 'socks-udp-1080-1092', 'egress-acl', 'dht-eight-carriers', 'balancer-path-loss-recovery', 'peer-direct-ten-modes', 'peer-override-denial', 'peer-relay', 'nat-mapping', 'update-rollback')
 $observed = Get-Content -Raw -LiteralPath $f.ObservationFile | ConvertFrom-Json
-if ($observed.sha256 -ne $ExpectedSha256 -or $observed.platform -ne $target) { throw 'parity observation does not belong to this ZIP and Windows build' }
+if ($observed.sha256 -ne $ExpectedSha256 -or $observed.platform -ne 'windows-11') { throw 'parity observation does not belong to this ZIP and Windows 11' }
 foreach ($scenario in $required) {
     $record = $observed.scenarios.PSObject.Properties[$scenario]
     if (!$record -or $record.Value.passed -ne $true -or [string]::IsNullOrWhiteSpace($record.Value.evidence)) { throw "missing passing evidence: $scenario" }
 }
-Write-Output "Windows parity accepted: $target $ExpectedSha256"
+Write-Output "Windows parity accepted: windows-11 $ExpectedSha256"

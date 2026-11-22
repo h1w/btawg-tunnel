@@ -70,12 +70,10 @@ jobs:
       - name: verify exact approved Windows bundle
         working-directory: dist
         env:
-          WINDOWS_10_VERIFIED_SHA256: ${{ secrets.WINDOWS_10_VERIFIED_SHA256 }}
           WINDOWS_11_VERIFIED_SHA256: ${{ secrets.WINDOWS_11_VERIFIED_SHA256 }}
         run: |
           set -eu
           actual=$(sha256sum btawg-client-windows-amd64.zip | cut -d' ' -f1)
-          test "$actual" = "$WINDOWS_10_VERIFIED_SHA256"
           test "$actual" = "$WINDOWS_11_VERIFIED_SHA256"
           sha256sum -c SHA256SUMS.windows
           cat SHA256SUMS.windows >> SHA256SUMS

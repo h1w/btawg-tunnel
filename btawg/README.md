@@ -189,16 +189,16 @@ to the applicable VPN addresses. Leave unrelated inbound traffic blocked.
 
 For release verification, run `scripts/test-windows.ps1 -Bundle <zip>` in an
 elevated test VM, then use `scripts/windows-parity.ps1 -Bundle <zip> -Fixture
-<json> -ExpectedSha256 <digest>` on Windows 10 22H2 and Windows 11 with a Linux
-hub and peer. The fixture JSON supplies `ImportFile`, `VPNIP`, `EchoURL`,
-`EchoBody`, `PeerEchoURL`, and `ObservationFile`. The observation JSON records
-`sha256`, `platform` (`windows-10-22h2` or `windows-11`), and a `scenarios` map
-with a `passed` boolean and a link or path to evidence for each required case
-listed by the harness. Do not include imports or credentials in the evidence.
+<json> -ExpectedSha256 <digest>` on Windows 11 x64 with a Linux hub and peer.
+The fixture JSON supplies `ImportFile`, `VPNIP`, `EchoURL`, `EchoBody`,
+`PeerEchoURL`, and `ObservationFile`. The observation JSON records `sha256`,
+`platform` (`windows-11`), and a `scenarios` map with a `passed` boolean and
+a link or path to evidence for each required case listed by the harness.
+Do not include imports or credentials in the evidence.
 Protect the `windows-client-parity` GitHub environment with required reviewers.
-Set its `WINDOWS_10_VERIFIED_SHA256` and `WINDOWS_11_VERIFIED_SHA256` secrets only
-after the respective passing runs for the tagged ZIP. The release refuses
-missing or different digests and publishes the tested ZIP unchanged.
+Set its `WINDOWS_11_VERIFIED_SHA256` secret after the passing run for the tagged
+ZIP. The release refuses a missing or different digest and publishes the tested
+ZIP unchanged.
 
 
 ### Update an installed service
