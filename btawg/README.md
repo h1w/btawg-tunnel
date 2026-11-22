@@ -25,6 +25,11 @@ latency win; see the benchmark for why this matters).
 
 ## Quickstart (VPS + one client, from zero)
 
+If installing from a release, use the filename for your architecture from
+[Release downloads](#release-downloads) in place of `./btawg-server` or
+`./btawg-client` in the first-run commands below. The installer uses the
+unsuffixed names for the installed commands and services.
+
 ### 1. Hub on a public-IP VPS
 
 ```sh
@@ -169,7 +174,7 @@ sudo ./btawg-client 'btawg://…'      # one mode, btawg0 interface
 
 | Platform | Client | Server |
 | --- | --- | --- |
-| Linux amd64 | `btawg-client` | `btawg-server` |
+| Linux amd64 | `btawg-client-linux-amd64` | `btawg-server-linux-amd64` |
 | Linux arm64 | `btawg-client-linux-arm64` | `btawg-server-linux-arm64` |
 | Windows 11 amd64 | `btawg-client-windows-amd64.zip` | — |
 | Windows 11 arm64 | `btawg-client-windows-arm64.zip` | — |
@@ -241,11 +246,19 @@ The client dashboard checks release availability in the background when it
 opens and shows a notice under the service status if a newer stable version
 is available. The check does not download or install an update.
 
-If your installed release has no **Update from GitHub** action, download the
-matching Linux amd64 executable and `SHA256SUMS` from the releases page, verify
-the corresponding checksum, make the binary executable, and run
-`sudo ./btawg-server install` or `sudo ./btawg-client install` as appropriate.
-This one-time install adds the updater. Both release binaries report their
+Linux amd64 installations from v0.11.1 or earlier still look for unsuffixed
+release assets. Upgrade those installations manually once. Download the
+matching executable and `SHA256SUMS` from the releases page and verify the
+corresponding checksum. Then replace the installed binary and restart only
+if its service is running. For the client:
+
+```sh
+sudo install -m 0755 btawg-client-linux-amd64 /usr/local/bin/btawg-client
+sudo systemctl try-restart btawg-client.service
+```
+
+For the server, substitute `btawg-server` for `btawg-client` in both commands.
+Subsequent updates work from the dashboard. Both binaries report their
 version with `--version`.
 
 ### 4. Verify

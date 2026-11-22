@@ -40,10 +40,7 @@ func (u Unit) releaseAsset(goos, goarch string) string {
 	switch goos {
 	case "linux":
 		if u == Client || u == Server {
-			if goarch == "amd64" {
-				return u.binaryName()
-			}
-			return u.binaryName() + "-linux-arm64"
+			return u.binaryName() + "-linux-" + goarch
 		}
 	case "windows":
 		if u == Client {

@@ -7,8 +7,8 @@ func TestReleaseAssetMatchesTarget(t *testing.T) {
 		unit           Unit
 		os, arch, want string
 	}{
-		{Client, "linux", "amd64", "btawg-client"},
-		{Server, "linux", "amd64", "btawg-server"},
+		{Client, "linux", "amd64", "btawg-client-linux-amd64"},
+		{Server, "linux", "amd64", "btawg-server-linux-amd64"},
 		{Client, "linux", "arm64", "btawg-client-linux-arm64"},
 		{Server, "linux", "arm64", "btawg-server-linux-arm64"},
 		{Client, "windows", "amd64", "btawg-client-windows-amd64.zip"},

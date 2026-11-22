@@ -41,10 +41,7 @@ func TestUpdateFromRelease(t *testing.T) {
 			t.Cleanup(func() { binDir, systemctlRunner = oldBinDir, oldRunner })
 			name := "btawg-" + string(tc.unit)
 			path := filepath.Join(binDir, name)
-			assetName := name
-			if runtime.GOARCH == "arm64" {
-				assetName += "-linux-arm64"
-			}
+			assetName := name + "-linux-" + runtime.GOARCH
 			if err := os.WriteFile(path, []byte(tc.installed), 0o755); err != nil {
 				t.Fatal(err)
 			}

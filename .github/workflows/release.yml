@@ -38,8 +38,7 @@ jobs:
           version_flags="-s -w -X bittorrent-tunnel/btawg/internal/service.Version=${GITHUB_REF_NAME}"
           mkdir -p dist
           for kind in server client; do
-            name="btawg-$kind"
-            if [[ "$GOARCH" == arm64 ]]; then name+=-linux-arm64; fi
+            name="btawg-$kind-linux-$GOARCH"
             go build -trimpath -ldflags "$version_flags" -o "dist/$name" "./cmd/btawg-$kind"
             test "$("dist/$name" --version)" = "$GITHUB_REF_NAME"
             (cd dist && sha256sum "$name") >> "dist/SHA256SUMS.linux-$GOARCH"
@@ -101,13 +100,13 @@ jobs:
         working-directory: dist
         run: |
           cat SHA256SUMS.linux-amd64 SHA256SUMS.linux-arm64 SHA256SUMS.windows-amd64 SHA256SUMS.windows-arm64 > SHA256SUMS
-          diff -u <(printf '%s\n' btawg-client btawg-client-linux-arm64 btawg-client-windows-amd64.zip btawg-client-windows-arm64.zip btawg-server btawg-server-linux-arm64) <(awk '{print $2}' SHA256SUMS | sort)
+          diff -u <(printf '%s\n' btawg-client-linux-amd64 btawg-client-linux-arm64 btawg-client-windows-amd64.zip btawg-client-windows-arm64.zip btawg-server-linux-amd64 btawg-server-linux-arm64) <(awk '{print $2}' SHA256SUMS | sort)
           sha256sum --strict -c SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/btawg-server
-            dist/btawg-client
+            dist/btawg-server-linux-amd64
+            dist/btawg-client-linux-amd64
             dist/btawg-server-linux-arm64
             dist/btawg-client-linux-arm64
             dist/btawg-client-windows-amd64.zip
