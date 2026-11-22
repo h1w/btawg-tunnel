@@ -43,6 +43,16 @@ type Screen struct {
 	Save    func([]Field) (*Screen, error)
 	Dismiss func() error
 	Reorder bool // -/+ move the highlighted form field up/down
+
+	credentials [2]string // raw SOCKS5 values, independent of the display text
+}
+
+// SOCKSCredentialsScreen shows the values separately for display and copying.
+func SOCKSCredentialsScreen(title, username, password string) *Screen {
+	return &Screen{
+		Title: title, Text: "Username:\n" + username + "\nPassword:\n" + password,
+		credentials: [2]string{username, password},
+	}
 }
 
 type Field struct {
@@ -54,6 +64,7 @@ type Field struct {
 }
 
 const updateActionLabel = "Update from GitHub"
+const maxFieldBytes = 16384
 
 func TUI(menu Menu) error {
 	restore, err := prepareDashboardConsole()
@@ -501,6 +512,10 @@ func (d *dashboard) key(e tui.KeyEvent) {
 	if d.busy && d.working != "" && d.working != updateActionLabel {
 		return
 	}
+	if d.clipboardKey(e) {
+		d.app.MarkDirty()
+		return
+	}
 	if e.Key == tui.KeyEscape || quit {
 		d.back()
 	} else {
@@ -543,7 +558,7 @@ func (d *dashboard) key(e tui.KeyEvent) {
 					f.Value = f.Value[:len(f.Value)-size]
 				case !f.Toggle && e.Rune == 'u' && e.Mod.Has(tui.ModCtrl):
 					f.Value = ""
-				case !f.Toggle && !e.Mod.Has(tui.ModCtrl|tui.ModAlt) && unicode.IsPrint(e.Rune) && len(f.Value) < 16384:
+				case !f.Toggle && !e.Mod.Has(tui.ModCtrl|tui.ModAlt) && unicode.IsPrint(e.Rune) && len(f.Value) < maxFieldBytes:
 					f.Value += string(e.Rune)
 				}
 			} else if e.Rune == ' ' && (d.screen == nil || len(d.screen.Choices) > 0) {
@@ -603,7 +618,9 @@ func (d *dashboard) Render(app *tui.App) *tui.Element {
 	if d.current.state != "" && state != NotInstalled {
 		status += "   |   Autostart: " + checkbox(d.current.enabled)
 	}
-	switch {
+	switch hint := d.clipboardHint(); {
+	case hint != "":
+		status += "   |   " + hint
 	case !d.mouseReleased:
 		status += "   |   Ctrl+T: select text"
 	case d.selectText:

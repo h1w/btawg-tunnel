@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	tui "github.com/grindlemire/go-tui"
 )
 
 func (u Unit) logs() (*Screen, error) {
@@ -19,3 +21,6 @@ func (u Unit) logs() (*Screen, error) {
 }
 
 func prepareDashboardConsole() (func(), error) { return func() {}, nil }
+
+func (d *dashboard) clipboardKey(tui.KeyEvent) bool { return false }
+func (d *dashboard) clipboardHint() string          { return "" }

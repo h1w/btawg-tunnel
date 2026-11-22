@@ -191,6 +191,12 @@ as on Linux. For unattended setup, run `./btawg-client.exe install -import-file
 client.txt`. The native Windows service starts at boot and works without the
 terminal. **Remove service** leaves your configuration and installed bundle.
 
+In the **VPN import** field, press **Ctrl+V** or **F2** to paste from the
+Windows clipboard. The import stays hidden; only its length is shown. In
+**Show SOCKS5 credentials**, press **F2** to copy the username or **F3** to
+copy the password, without selecting terminal text. Each shortcut copies only
+that value into the Windows clipboard.
+
 The Wintun interface uses the imported IPv4 address and routes, not a default
 route. A conflicting LAN or VPN prefix is an error; fix the overlap before
 starting the real-TUN client. The TUI, SOCKS5 ports, balance pools and peer
