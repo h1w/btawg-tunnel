@@ -63,9 +63,11 @@ type FirewallCallback = func(net.Addr) bool
 // net.PacketConn: uTP traffic is dispatched to connections, and everything else is handed to
 // ReadFrom, so a single port can carry uTP and another protocol at once.
 type Socket struct {
-	mu sync.Mutex
-	pc net.PacketConn
-	tx *udpWriteBatch
+	mu          sync.Mutex
+	pc          net.PacketConn
+	tx          *udpWriteBatch
+	pcCloseOnce sync.Once
+	pcCloseErr  error
 	// Pacing is optional; these fields are guarded by mu with the send path.
 	paceBytesPerSecond int64
 	paceNext           time.Time
@@ -186,6 +188,13 @@ func NewSocketFromPacketConn(pc net.PacketConn, opts ...NewSocketOpt) (*Socket, 
 	if udp, ok := pc.(*net.UDPConn); runtime.GOOS == "linux" && ok && udp.LocalAddr().(*net.UDPAddr).IP.To4() != nil {
 		s.tx = newUDPWriteBatch(udp)
 	}
+	if runtime.GOOS == "windows" {
+		if sender, ok := pc.(interface {
+			SendUDPSegments([][]byte, *net.UDPAddr) (bool, error)
+		}); ok {
+			s.tx = newWindowsUDPWriteBatch(sender)
+		}
+	}
 	s.nonUtpReadCond.L = &s.mu
 	for _, opt := range opts {
 		opt(s)
@@ -281,13 +290,26 @@ type udpWriteBatch struct {
 	control  [32]byte
 	segment  [1]ipv4.Message
 	noGSO    bool
-	stamp    uint64
-	n        int
-	active   bool
+	sender   interface {
+		SendUDPSegments([][]byte, *net.UDPAddr) (bool, error)
+	}
+	stamp  uint64
+	n      int
+	active bool
 }
 
 func newUDPWriteBatch(c *net.UDPConn) *udpWriteBatch {
 	tx := &udpWriteBatch{pc: ipv4.NewPacketConn(c)}
+	for i := range tx.messages {
+		tx.messages[i].Buffers = tx.buffers[i][:]
+	}
+	return tx
+}
+
+func newWindowsUDPWriteBatch(sender interface {
+	SendUDPSegments([][]byte, *net.UDPAddr) (bool, error)
+}) *udpWriteBatch {
+	tx := &udpWriteBatch{sender: sender}
 	for i := range tx.messages {
 		tx.messages[i].Buffers = tx.buffers[i][:]
 	}
@@ -315,6 +337,40 @@ func (s *Socket) flushWrites() {
 		m := &messages[0]
 		if _, err := s.pc.WriteTo(m.Buffers[0], m.Addr); err != nil {
 			s.logf(logNormal, "error writing to %v: %v", m.Addr, err)
+		}
+	} else if tx.sender != nil {
+		for i := 0; i < len(messages); {
+			peer, ok := messages[i].Addr.(*net.UDPAddr)
+			end := i + 1
+			if ok {
+				for end < len(messages) {
+					next, valid := messages[end].Addr.(*net.UDPAddr)
+					if !valid || next.AddrPort() != peer.AddrPort() || len(messages[end].Buffers[0]) != len(messages[i].Buffers[0]) {
+						break
+					}
+					end++
+				}
+			}
+			sent := false
+			if end-i > 1 {
+				for j := i; j < end; j++ {
+					tx.segments[j-i] = messages[j].Buffers[0]
+				}
+				var err error
+				sent, err = tx.sender.SendUDPSegments(tx.segments[:end-i], peer)
+				if err != nil {
+					s.logf(logNormal, "error writing to %v: %v", peer, err)
+					sent = true // An indeterminate or failed send must never be duplicated.
+				}
+			}
+			if !sent {
+				for _, m := range messages[i:end] {
+					if _, err := s.pc.WriteTo(m.Buffers[0], m.Addr); err != nil {
+						s.logf(logNormal, "error writing to %v: %v", m.Addr, err)
+					}
+				}
+			}
+			i = end
 		}
 	} else if !tx.trySegment(messages) {
 		for pending := messages; len(pending) > 0; {
@@ -360,7 +416,7 @@ func (s *Socket) paceData(bytes int) {
 }
 
 func (s *Socket) reader() {
-	if s.tx != nil {
+	if runtime.GOOS == "linux" && s.tx != nil {
 		s.readBatches()
 		return
 	}
@@ -657,6 +713,7 @@ func (s *Socket) LocalAddr() net.Addr { return s.pc.LocalAddr() }
 // Close closes the Socket and the PacketConn under it. Connections on it are torn down without
 // waiting for outstanding data to be delivered.
 func (s *Socket) Close() error {
+	s.closePacketConn()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.closeLocked()
@@ -679,7 +736,12 @@ func (s *Socket) closeLocked() error {
 	s.ackConns = nil
 	close(s.backlog)
 	s.nonUtpReadCond.Broadcast()
-	return s.pc.Close()
+	return s.closePacketConn()
+}
+
+func (s *Socket) closePacketConn() error {
+	s.pcCloseOnce.Do(func() { s.pcCloseErr = s.pc.Close() })
+	return s.pcCloseErr
 }
 
 // Dial connects to addr on the Socket's own network.

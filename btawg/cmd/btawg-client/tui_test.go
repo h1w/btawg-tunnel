@@ -105,6 +105,14 @@ func TestSOCKSMenuUsesConfiguredBase(t *testing.T) {
 	}
 }
 
+func TestAdaptivePortDisplaysSelectedMode(t *testing.T) {
+	status := client.ControlResponse{AdaptiveMode: "wg"}
+	actions := portActions(status, true)
+	if !strings.Contains(actions[len(actions)-1].Label, "wg") {
+		t.Fatalf("selected adaptive mode missing: %s", actions[len(actions)-1].Label)
+	}
+}
+
 func TestParsePeerPort(t *testing.T) {
 	for _, tc := range []struct {
 		input string

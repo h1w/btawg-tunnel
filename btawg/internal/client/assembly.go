@@ -225,8 +225,41 @@ func (m *Managed) applyLocked(enabled []string, auth Credentials, pools map[stri
 		b := &m.balance[i]
 		b.replace(paths)
 		if rotated {
-			m.inbound.replace(len(modes)+i, socks.NewBalancer(func() (*socks.Server, context.Context) {
-				return m.network.selectProxy(ManagedPortBase+len(modes)+i, b.pick())
+			m.inbound.replace(len(modes)+i, socks.NewObservedBalancer(func(tcp bool) (*socks.Server, context.Context, func(bool, int64, time.Duration, time.Time)) {
+				port := ManagedPortBase + len(modes) + i
+				if b.policy != adaptivePolicy {
+					proxy, life := m.network.selectProxy(port, b.pick())
+					return proxy, life, nil
+				}
+				b.mu.Lock()
+				route, catalog := m.network.selected.Load(), m.network.catalogue.Load()
+				epoch := b.routeEpoch
+				var path *managedTunnel
+				if tcp {
+					path = b.pickTCPLocked()
+				} else {
+					path = b.pickLocked()
+				}
+				var selected adaptivePath
+				if path != nil {
+					selected, _ = path.adaptiveScore()
+				}
+				b.mu.Unlock()
+				if selected.tunnel == nil {
+					return nil, nil, nil
+				}
+				if !tcp {
+					proxy, life := m.network.selectProxySnapshot(port, path, route, catalog, nil)
+					return proxy, life, nil
+				}
+				var relayed atomic.Bool
+				proxy, life := m.network.selectProxySnapshot(port, path, route, catalog, &relayed)
+				hub := route == nil || selectedRouteID(*route, port) == HubRouteID
+				return proxy, life, func(upload bool, bytes int64, duration time.Duration, at time.Time) {
+					if hub || relayed.Load() {
+						b.recordScoped(selected, upload, bytes, duration, at, epoch)
+					}
+				}
 			}).WithCredentials(auth.Username, auth.Password))
 		}
 	}

@@ -2,7 +2,9 @@ package socks
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net"
 	"testing"
@@ -96,6 +98,49 @@ func TestConnectRoundTrip(t *testing.T) {
 	}
 }
 
+func TestObservedBalancerReportsCompletedTCPDirection(t *testing.T) {
+	echo := tcpEcho(t)
+	upstream := NewServer(func(ctx context.Context, network, addr string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, network, addr)
+	}, nil)
+	type sample struct {
+		upload bool
+		bytes  int64
+	}
+	samples := make(chan sample, 2)
+	b := NewObservedBalancer(func(tcp bool) (*Server, context.Context, func(bool, int64, time.Duration, time.Time)) {
+		return upstream, context.Background(), func(upload bool, n int64, _ time.Duration, _ time.Time) { samples <- sample{upload, n} }
+	})
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go b.Serve(ctx, ln)
+	c, err := NewClient(ln.Addr().String()).Dial(ctx, "tcp", echo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Write([]byte("hello")); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 5)
+	if _, err := io.ReadFull(c, buf); err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+	select {
+	case got := <-samples:
+		if got.bytes != 5 {
+			t.Fatalf("completed transfer = %+v", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("missing completed transfer sample")
+	}
+}
+
 func TestUDPAssociateRoundTrip(t *testing.T) {
 	remote := startEgress(t)
 	echo := udpEcho(t)
@@ -140,5 +185,41 @@ func TestNoAuthMethods(t *testing.T) {
 	}
 	if reply[0] != socksVersion || reply[1] != 0xFF {
 		t.Fatalf("reply = %v, want [5 FF]", reply)
+	}
+}
+
+type failingTransferWriter struct{}
+
+func (failingTransferWriter) Write([]byte) (int, error) { return 0, errors.New("receiver aborted") }
+
+func TestTransferObservationRejectsAbortedWrite(t *testing.T) {
+	called := false
+	copyObserved(failingTransferWriter{}, bytes.NewReader(make([]byte, 1024)), true, func(bool, int64, time.Duration, time.Time) { called = true })
+	if called {
+		t.Fatal("aborted copy produced a sample")
+	}
+}
+
+func TestTransferObservationUsesLastProductiveTimestamp(t *testing.T) {
+	before := time.Now()
+	var at time.Time
+	copyObserved(io.Discard, bytes.NewReader([]byte("payload")), false, func(_ bool, _ int64, _ time.Duration, last time.Time) { at = last })
+	if at.Before(before) || at.After(time.Now()) {
+		t.Fatalf("last payload timestamp = %v", at)
+	}
+}
+
+func TestDownloadStallRemainsMeasuredWithoutPenalizingIdleUpload(t *testing.T) {
+	for _, tc := range []struct{ upload, wantIdle bool }{{true, true}, {false, false}} {
+		r := &transferReader{Reader: bytes.NewReader([]byte("data")), upload: tc.upload, last: time.Now().Add(-2 * time.Second)}
+		if _, err := r.Read(make([]byte, 4)); err != nil {
+			t.Fatal(err)
+		}
+		if r.idle != tc.wantIdle {
+			t.Fatalf("upload %v idle = %v", tc.upload, r.idle)
+		}
+		if !tc.upload && r.duration < 2*time.Second {
+			t.Fatal("download stall omitted from goodput")
+		}
 	}
 }

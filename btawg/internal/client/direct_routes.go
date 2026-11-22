@@ -211,7 +211,7 @@ func (s *sharedTUN) peerPathAllowedLocked(ip netip.Addr, p *tunPath) bool {
 	return slices.Contains(settings.Incoming, p.peerMode)
 }
 
-func (s *sharedTUN) enqueuePacket(path *tunPath, storage *[]byte, buf, packet []byte) bool {
+func (s *sharedTUN) enqueuePacket(path *tunPath, storage *[]byte, buf, packet []byte) enqueueResult {
 	if !s.peerEnabled.Load() {
 		return path.enqueue(storage, buf)
 	}
@@ -219,7 +219,7 @@ func (s *sharedTUN) enqueuePacket(path *tunPath, storage *[]byte, buf, packet []
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.shouldRoutePeerLocked(dst) && !s.peerPathAllowedLocked(dst, path) {
-		return false
+		return enqueueRejected
 	}
 	return path.enqueue(storage, buf)
 }

@@ -219,11 +219,16 @@ func portActions(status client.ControlResponse, running bool) []service.Action {
 		if !custom {
 			pool = status.Enabled
 		}
+		selected := ""
+		if policy == "adaptive" && running && status.AdaptiveMode != "" {
+			selected = "  •  selected: " + status.AdaptiveMode
+		}
 		actions = append(actions, service.Action{
-			Label: fmt.Sprintf("    %d  %-22s %d/%d tunnels  •  %s", port, label, len(pool), len(modes), routeLabel(status, port, running)),
+			Label: fmt.Sprintf("    %d  %-22s %d/%d tunnels  •  %s%s", port, label, len(pool), len(modes), routeLabel(status, port, running), selected),
 			Run: func() (*service.Screen, error) {
 				return &service.Screen{
 					Title: fmt.Sprintf("SOCKS5 %d — %s", port, label),
+					Text:  selectedBalancerDetails(policy, status, running),
 					Choices: []service.Action{
 						{Label: "Configure tunnels", Run: func() (*service.Screen, error) { return balancerSettings(port, label, policy) }},
 						routeAction(port, status, running),
@@ -233,6 +238,20 @@ func portActions(status client.ControlResponse, running bool) []service.Action {
 		})
 	}
 	return actions
+}
+
+func selectedBalancerDetails(policy string, status client.ControlResponse, running bool) string {
+	if policy != "adaptive" || !running {
+		return ""
+	}
+	var details []string
+	if status.AdaptiveMode != "" {
+		details = append(details, "Selected tunnel: "+status.AdaptiveMode)
+	}
+	if status.WindowsSOCKSQueueStalls > 0 {
+		details = append(details, fmt.Sprintf("Windows SOCKS queue saturation events since service start: %d", status.WindowsSOCKSQueueStalls))
+	}
+	return strings.Join(details, "\n")
 }
 
 func routeLabel(status client.ControlResponse, port int, running bool) string {

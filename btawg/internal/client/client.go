@@ -411,8 +411,9 @@ func (c *Client) connectCarrier(ctx context.Context, addr netip.AddrPort) (carri
 		}
 		closeSocket = sock.Close
 	case config.ModeExtTCP, config.ModeReqTCP, config.ModeTLSExtTCP, config.ModeTLSReqTCP:
+		var guard tunsetup.UnderlayDialGuard
 		d := net.Dialer{Control: func(network, address string, raw syscall.RawConn) error {
-			if err := tunsetup.UnderlayControl(network, address, raw); err != nil {
+			if err := guard.Control(network, address, raw); err != nil {
 				return err
 			}
 			return carrier.TCPControl(network, address, raw)
@@ -421,7 +422,7 @@ func (c *Client) connectCarrier(ctx context.Context, addr netip.AddrPort) (carri
 		if err != nil {
 			return nil, nil, fmt.Errorf("carrier dial %s: %w", addr, err)
 		}
-		conn, err = tunsetup.ProtectUnderlayStream(conn, addr.Addr())
+		conn, err = guard.Protect(conn, addr.Addr())
 		if err != nil {
 			return nil, nil, fmt.Errorf("carrier underlay: %w", err)
 		}

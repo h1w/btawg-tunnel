@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/mesh"
 	"bittorrent-tunnel/btawg/internal/routeproxy"
 	"bittorrent-tunnel/btawg/internal/socks"
@@ -27,6 +30,52 @@ type catalogue struct {
 	routes   []mesh.Route
 	gateways []netip.Addr
 	until    time.Time
+}
+
+type adaptiveRoute struct {
+	id       string
+	identity [32]byte
+}
+
+// The hub-authenticated catalogue contains a signed, readable grant. Its
+// payload identifies the ordered chain; expiration and MAC change on renewal.
+// This decoding is only for local measurement scope, never authorization.
+func adaptiveRouteIdentity(id string, catalog *catalogue) adaptiveRoute {
+	route := adaptiveRoute{id: id}
+	if id == mesh.HubRoute || catalog == nil {
+		return route
+	}
+	for _, item := range catalog.routes {
+		if item.ID != id || item.Grant == "" {
+			continue
+		}
+		if len(item.Grant) > 2048 {
+			route.identity = sha256.Sum256([]byte(item.Grant))
+			return route
+		}
+		decoded, err := base64.RawURLEncoding.Strict().DecodeString(item.Grant)
+		if err != nil || len(decoded) <= sha256.Size || len(decoded) > 2048 {
+			route.identity = sha256.Sum256([]byte(item.Grant))
+			return route
+		}
+		var grant mesh.Grant
+		if json.Unmarshal(decoded[:len(decoded)-sha256.Size], &grant) != nil || grant.RouteID != id || len(grant.Hops) < 1 || len(grant.Hops) > 2 {
+			route.identity = sha256.Sum256([]byte(item.Grant))
+			return route
+		}
+		body, _ := json.Marshal(grant.Hops)
+		route.identity = sha256.Sum256(body)
+		return route
+	}
+	return route
+}
+
+func adaptiveRouteFor(selection *map[int]string, catalog *catalogue) adaptiveRoute {
+	id := mesh.HubRoute
+	if selection != nil {
+		id = selectedRouteID(*selection, ManagedPortBase+len(config.ClientModes())+2)
+	}
+	return adaptiveRouteIdentity(id, catalog)
 }
 
 type meshNode struct {
@@ -51,8 +100,11 @@ func (m *Managed) RouteOptions() []RouteOption {
 }
 
 func (m *Managed) applyRoutes(routes map[int]string) {
-	// The immutable snapshot is published before the listener can accept.
+	b := &m.balance[slices.Index(balancerPolicies[:], adaptivePolicy)]
+	b.mu.Lock()
 	m.network.selected.Store(&routes)
+	b.setRouteLocked(adaptiveRouteFor(&routes, m.network.catalogue.Load()))
+	b.mu.Unlock()
 }
 
 func (m *Managed) applyPeerSettings(cfg PeerSettings) {
@@ -68,11 +120,15 @@ func (m *Managed) startNetwork(p2p, autoMap, allowPermanentUPnP, serve bool, por
 }
 
 func (n *meshNode) selectProxy(port int, path *managedTunnel) (*socks.Server, context.Context) {
+	return n.selectProxySnapshot(port, path, n.selected.Load(), n.catalogue.Load(), nil)
+}
+
+func (n *meshNode) selectProxySnapshot(port int, path *managedTunnel, selection *map[int]string, c *catalogue, relayed *atomic.Bool) (*socks.Server, context.Context) {
 	if path == nil || path.life.Err() != nil {
 		return nil, nil
 	}
 	id := mesh.HubRoute
-	if selection := n.selected.Load(); selection != nil {
+	if selection != nil {
 		if v := (*selection)[port]; v != "" {
 			id = v
 		}
@@ -80,7 +136,6 @@ func (n *meshNode) selectProxy(port int, path *managedTunnel) (*socks.Server, co
 	if id == mesh.HubRoute {
 		return path.proxy, path.life
 	}
-	c := n.catalogue.Load()
 	if c == nil || !time.Now().Before(c.until) {
 		return nil, nil
 	}
@@ -92,7 +147,11 @@ func (n *meshNode) selectProxy(port int, path *managedTunnel) (*socks.Server, co
 		return routeproxy.ProxyWithFallback(func(ctx context.Context, _ routeproxy.Request) (net.Conn, error) {
 			return n.dialDirectRoute(ctx, r.First)
 		}, func(ctx context.Context, req routeproxy.Request) (net.Conn, error) {
-			return n.dialRouteRelay(ctx, path, req)
+			conn, err := n.dialRouteRelay(ctx, path, req)
+			if err == nil && relayed != nil {
+				relayed.Store(true)
+			}
+			return conn, err
 		}, req), path.life
 	}
 	return nil, nil
@@ -405,10 +464,19 @@ func (n *meshNode) register(reg mesh.Registration) (mesh.Reply, error) {
 	defer cancel()
 	reply, err := n.exchange(ctx, mesh.Request{Registration: &reg})
 	if err == nil {
-		n.catalogue.Store(&catalogue{reply.Routes, reply.Gateways, time.Now().Add(mesh.Lease)})
+		b := &n.owner.balance[slices.Index(balancerPolicies[:], adaptivePolicy)]
+		b.mu.Lock()
+		catalog := &catalogue{reply.Routes, reply.Gateways, time.Now().Add(mesh.Lease)}
+		n.catalogue.Store(catalog)
+		b.setRouteLocked(adaptiveRouteFor(n.selected.Load(), catalog))
+		b.mu.Unlock()
 	}
 	if errors.Is(err, errMeshDenied) {
+		b := &n.owner.balance[slices.Index(balancerPolicies[:], adaptivePolicy)]
+		b.mu.Lock()
 		n.catalogue.Store(nil)
+		b.setRouteLocked(adaptiveRouteFor(n.selected.Load(), nil))
+		b.mu.Unlock()
 	}
 	return reply, err
 }

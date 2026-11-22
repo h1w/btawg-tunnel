@@ -426,10 +426,11 @@ func (s *Socket) dialTCP(ctx context.Context, a *attempt) {
 	for ctx.Err() == nil {
 		for _, addr := range a.tcpCandidates {
 			attemptCtx, cancel := context.WithTimeout(ctx, streamAttemptTimeout)
-			dialer := net.Dialer{Control: tunsetup.UnderlayControl}
+			var guard tunsetup.UnderlayDialGuard
+			dialer := net.Dialer{Control: guard.Control}
 			c, err := dialer.DialContext(attemptCtx, "tcp", addr.String())
 			if err == nil {
-				c, err = tunsetup.ProtectUnderlayStream(c, addr.Addr())
+				c, err = guard.Protect(c, addr.Addr())
 			}
 			if err == nil {
 				err = s.outboundTCP(attemptCtx, a, c)

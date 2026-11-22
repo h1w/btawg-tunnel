@@ -30,21 +30,23 @@ type ControlRequest struct {
 }
 
 type ControlResponse struct {
-	OK             bool                `json:"ok"`
-	Enabled        []string            `json:"enabled"`
-	SOCKSBasePort  int                 `json:"socks_base_port,omitempty"`
-	Balancers      map[string][]string `json:"balancers,omitempty"`
-	Credentials    *Credentials        `json:"credentials,omitempty"`
-	Routes         []RouteOption       `json:"routes,omitempty"`
-	SelectedRoutes map[int]string      `json:"selected_routes,omitempty"`
-	P2P            bool                `json:"p2p"`
-	AutoMap        bool                `json:"auto_map"`
-	ServeEgress    bool                `json:"serve_egress"`
-	PeerPort       uint16              `json:"peer_port,omitempty"`
-	PeerEndpoint   string              `json:"peer_endpoint,omitempty"`
-	Peer           PeerSettings        `json:"peer"`
-	PeerRevision   string              `json:"peer_revision,omitempty"`
-	Error          string              `json:"error,omitempty"`
+	OK                      bool                `json:"ok"`
+	Enabled                 []string            `json:"enabled"`
+	SOCKSBasePort           int                 `json:"socks_base_port,omitempty"`
+	Balancers               map[string][]string `json:"balancers,omitempty"`
+	AdaptiveMode            string              `json:"adaptive_mode,omitempty"`
+	WindowsSOCKSQueueStalls uint64              `json:"windows_socks_queue_stalls,omitempty"`
+	Credentials             *Credentials        `json:"credentials,omitempty"`
+	Routes                  []RouteOption       `json:"routes,omitempty"`
+	SelectedRoutes          map[int]string      `json:"selected_routes,omitempty"`
+	P2P                     bool                `json:"p2p"`
+	AutoMap                 bool                `json:"auto_map"`
+	ServeEgress             bool                `json:"serve_egress"`
+	PeerPort                uint16              `json:"peer_port,omitempty"`
+	PeerEndpoint            string              `json:"peer_endpoint,omitempty"`
+	Peer                    PeerSettings        `json:"peer"`
+	PeerRevision            string              `json:"peer_revision,omitempty"`
+	Error                   string              `json:"error,omitempty"`
 }
 
 // PortBase returns the first SOCKS5 listen port, including for older daemons.
@@ -177,6 +179,17 @@ func (d *clientControl) handle(req ControlRequest) ControlResponse {
 	}
 	r := next.response(req.Op)
 	r.Routes = options
+	b := &d.m.balance[slices.Index(balancerPolicies[:], adaptivePolicy)]
+	b.mu.Lock()
+	if path := b.current.tunnel; path != nil && path.c != nil && b.routeSet {
+		if current, score := path.adaptiveScore(); current == b.current && score > 0 {
+			r.AdaptiveMode = path.c.cfg.Transport
+		}
+	}
+	b.mu.Unlock()
+	if d.m.shared != nil {
+		r.WindowsSOCKSQueueStalls = d.m.shared.overlayQueueStalls.Load()
+	}
 	return r
 }
 

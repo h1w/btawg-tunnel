@@ -37,6 +37,26 @@ type windowsOverlay struct {
 	closed bool
 }
 
+// The default gVisor qdisc ignores a short link write. Report a full link
+// queue explicitly instead of silently admitting another UDP datagram.
+type windowsOverlayQueue struct {
+	link   *channel.Endpoint
+	shared *sharedTUN
+}
+
+func (q *windowsOverlayQueue) WritePacket(pkt stack.PacketBufferPtr) tcpip.Error {
+	var packets stack.PacketBufferList
+	packets.PushBack(pkt)
+	n, err := q.link.WritePackets(packets)
+	if err == nil && n == 0 {
+		q.shared.overlayQueueStalls.Add(1)
+		return &tcpip.ErrNoBufferSpace{}
+	}
+	return err
+}
+
+func (*windowsOverlayQueue) Close() {}
+
 func newWindowsOverlay(path *tunPath, local netip.Addr) (*windowsOverlay, error) {
 	link := channel.New(pathQueueSize, uint32(path.shared.mtu), "")
 	s := stack.New(stack.Options{
@@ -48,7 +68,7 @@ func newWindowsOverlay(path *tunPath, local netip.Addr) (*windowsOverlay, error)
 		if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &sack); err != nil {
 			return err
 		}
-		if err := s.CreateNIC(1, link); err != nil {
+		if err := s.CreateNICWithOptions(1, link, stack.NICOptions{QDisc: &windowsOverlayQueue{link: link, shared: path.shared}}); err != nil {
 			return err
 		}
 		return s.AddProtocolAddress(1, tcpip.ProtocolAddress{
@@ -71,7 +91,7 @@ func newWindowsOverlay(path *tunPath, local netip.Addr) (*windowsOverlay, error)
 func (o *windowsOverlay) forward() {
 	defer close(o.worker)
 	for {
-		pkt := o.link.ReadContext(context.Background())
+		pkt := o.link.ReadContext(o.life)
 		if pkt.IsNil() {
 			return
 		}
@@ -81,7 +101,7 @@ func (o *windowsOverlay) forward() {
 		n, _ := data.ReadAt(buf[packetHeadroom:], 0)
 		data.Release()
 		pkt.DecRef()
-		if n == 0 || !o.path.shared.enqueuePacket(o.path, b, buf[:packetHeadroom+n], buf[packetHeadroom:packetHeadroom+n]) {
+		if n == 0 || !o.path.shared.enqueueOverlayPacket(o.life, o.path, b, buf[:packetHeadroom+n], buf[packetHeadroom:packetHeadroom+n]) {
 			o.path.shared.pool.Put(b)
 		}
 	}
@@ -237,11 +257,20 @@ func (o *windowsOverlay) udp(ctx context.Context) (net.PacketConn, error) {
 		return nil, err
 	}
 	local := tcpip.FullAddress{NIC: 1, Addr: tcpip.AddrFrom4(o.local.As4()), Port: key.port}
-	c, err := gonet.DialUDP(o.stack, &local, nil, ipv4.ProtocolNumber)
-	if err != nil {
+	var wq waiter.Queue
+	ep, endpointErr := o.stack.NewEndpoint(udp.ProtocolNumber, ipv4.ProtocolNumber, &wq)
+	if endpointErr != nil {
 		o.path.shared.untrack(key, owner)
-		return nil, err
+		return nil, fmt.Errorf("create overlay UDP endpoint: %s", endpointErr)
 	}
+	// Without IP_RECVERR gVisor emulates Linux and suppresses ENOBUFS.
+	ep.SocketOptions().SetIPv4RecvError(true)
+	if bindErr := ep.Bind(local); bindErr != nil {
+		ep.Close()
+		o.path.shared.untrack(key, owner)
+		return nil, fmt.Errorf("bind overlay UDP endpoint: %s", bindErr)
+	}
+	c := gonet.NewUDPConn(o.stack, &wq, ep)
 	return &windowsUDP{UDPConn: c, path: o.path, key: key, owner: owner}, nil
 }
 

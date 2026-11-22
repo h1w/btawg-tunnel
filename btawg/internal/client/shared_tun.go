@@ -27,16 +27,17 @@ const (
 // Explicit proxy flows stay on their selected path; ordinary traffic uses
 // the lowest-index enabled transport unless a peer policy chooses another.
 type sharedTUN struct {
-	dev         tun.Device
-	name        string
-	mtu         int
-	closeRoute  func() error
-	primary     atomic.Pointer[tunPath]
-	servicePath atomic.Pointer[tunPath]
-	pool        sync.Pool
-	workers     sync.WaitGroup
-	done        chan struct{}
-	readErr     error // published by closing done
+	dev                tun.Device
+	name               string
+	mtu                int
+	closeRoute         func() error
+	primary            atomic.Pointer[tunPath]
+	servicePath        atomic.Pointer[tunPath]
+	pool               sync.Pool
+	workers            sync.WaitGroup
+	done               chan struct{}
+	readErr            error // published by closing done
+	overlayQueueStalls atomic.Uint64
 
 	mu             sync.RWMutex
 	ports          map[localPort]*socketPath
@@ -75,6 +76,7 @@ type tunPath struct {
 	peerMode     string
 	peerHealth   *managedTunnel
 	packets      chan *[]byte
+	queueSpace   chan struct{} // set before starting a Windows SOCKS producer
 	done         chan struct{}
 	events       chan tun.Event
 	mu           sync.Mutex // serialize close and enqueue
@@ -104,7 +106,11 @@ func newPacketBuffer(mtu int) *[]byte {
 }
 
 func (s *sharedTUN) newPath() *tunPath {
-	return &tunPath{shared: s, packets: make(chan *[]byte, pathQueueSize), done: make(chan struct{}), events: make(chan tun.Event)}
+	p := &tunPath{shared: s, packets: make(chan *[]byte, pathQueueSize), done: make(chan struct{}), events: make(chan tun.Event)}
+	if windowsAssemblesIngress {
+		p.queueSpace = make(chan struct{}, 1)
+	}
+	return p
 }
 
 func (s *sharedTUN) close() error {
@@ -191,7 +197,7 @@ func (s *sharedTUN) dispatch() {
 			} else {
 				path = s.packetPath(p, hlen)
 			}
-			if path != nil && s.enqueuePacket(path, storage[i], b, p) {
+			if path != nil && s.enqueuePacket(path, storage[i], b, p) == enqueueOK {
 				storage[i] = s.pool.Get().(*[]byte)
 				bufs[i] = (*storage[i])[:cap(*storage[i])]
 			}
@@ -225,19 +231,60 @@ func (s *sharedTUN) packetPath(p []byte, hlen int) *tunPath {
 	return s.primary.Load()
 }
 
-func (p *tunPath) enqueue(storage *[]byte, packet []byte) bool {
+type enqueueResult uint8
+
+const (
+	enqueueRejected enqueueResult = iota
+	enqueueOK
+	enqueueFull
+)
+
+func (p *tunPath) enqueue(storage *[]byte, packet []byte) enqueueResult {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.closed {
-		return false
+		return enqueueRejected
 	}
 	*storage = packet
 	select {
 	case p.packets <- storage:
-		return true
+		return enqueueOK
 	default:
-		return false
+		return enqueueFull
 	}
+}
+
+// A single overlay producer owns the buffer until it can be queued. Do not
+// hold a path or policy lock while waiting for the reader or for shutdown.
+func (s *sharedTUN) enqueueOverlayPacket(ctx context.Context, p *tunPath, storage *[]byte, buf, packet []byte) bool {
+	counted := false
+	for ctx.Err() == nil {
+		select {
+		case <-s.done:
+			return false
+		default:
+		}
+		switch s.enqueuePacket(p, storage, buf, packet) {
+		case enqueueOK:
+			return true
+		case enqueueRejected:
+			return false
+		}
+		if !counted {
+			s.overlayQueueStalls.Add(1)
+			counted = true
+		}
+		select {
+		case <-p.queueSpace:
+		case <-p.done:
+			return false
+		case <-s.done:
+			return false
+		case <-ctx.Done():
+			return false
+		}
+	}
+	return false
 }
 
 func (p *tunPath) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
@@ -260,6 +307,12 @@ func (p *tunPath) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 			case b = <-p.packets:
 			default:
 				return n, nil
+			}
+		}
+		if p.queueSpace != nil {
+			select {
+			case p.queueSpace <- struct{}{}:
+			default:
 			}
 		}
 		if !p.validDirect() {

@@ -12,11 +12,12 @@ try {
     $env:BTAWG_WINDOWS_BUNDLE_DRIVER = Join-Path $stage 'wintun.dll'
     $targets = @{
         tunsetup = @('./internal/tunsetup', '^Test(WindowsClientTUN|OwnedAdapter|Underlay)');
-        client = @('./internal/client', '^Test(Windows|Overlay|Daemon|Native|PeerUnderlay)');
+        client = @('./internal/client', '^Test(Windows|Overlay|Daemon|Native|PeerUnderlay|Adaptive|ControlStatusReportsAdaptiveSelection)');
         carrier = @('./internal/carrier', '^TestTCPControlCarriesDuplexTraffic$');
         service = @('./internal/service', '^Test(ReleaseAssetMatchesTarget|WindowsManaged|WindowsBundle|UpdateLock|UpdateRecovery|UpdateActivation)');
-        cli = @('./cmd/btawg-client', '^TestPeer');
+        cli = @('./cmd/btawg-client', '^Test(Peer|Adaptive)');
         portmap = @('./internal/portmap', '^TestGateway');
+        socks = @('./internal/socks', '^Test(ObservedBalancer|TransferObservation|DownloadStall)');
     }
     foreach ($suite in $targets.Keys) {
         $test = Join-Path $stage "$suite.test.exe"
@@ -24,6 +25,13 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "$suite test build failed" }
         & $test '-test.v' '-test.timeout=120s' "-test.run=$($targets[$suite][1])"
         if ($LASTEXITCODE -ne 0) { throw "$suite Windows smoke failed" }
+    }
+    Push-Location third_party/go-utp
+    try {
+        go test ./purego -run '^TestWindowsUDP' -count=1 -timeout=120s
+        if ($LASTEXITCODE -ne 0) { throw 'µTP Windows batch smoke failed' }
+    } finally {
+        Pop-Location
     }
 } finally {
     Pop-Location

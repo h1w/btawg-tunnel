@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // DialFunc dials one TCP connection to the destination.
@@ -40,6 +41,7 @@ type Server struct {
 	dialNamedUDP       DialNamedUDPFunc
 	resolveUDP         func(context.Context, netip.Addr, string) (netip.Addr, error)
 	selectUpstream     func() (*Server, context.Context)
+	selectObserved     func(bool) (*Server, context.Context, func(bool, int64, time.Duration, time.Time))
 	greetingMethod     byte
 	username, password []byte
 }
@@ -58,6 +60,11 @@ func NewNamedUDPServer(dial DialFunc, dialUDP DialNamedUDPFunc) *Server {
 // one upstream for the whole TCP connection or UDP association.
 func NewBalancer(selectUpstream func() (*Server, context.Context)) *Server {
 	return &Server{selectUpstream: selectUpstream}
+}
+
+// NewObservedBalancer selects once per request and observes completed TCP directions.
+func NewObservedBalancer(selectUpstream func(bool) (*Server, context.Context, func(bool, int64, time.Duration, time.Time))) *Server {
+	return &Server{selectObserved: selectUpstream}
 }
 
 // WithCredentials requires username/password authentication on this server.
@@ -109,8 +116,15 @@ func (s *Server) handle(ctx context.Context, c net.Conn) {
 		writeReply(c, replyGeneralFailure)
 		return
 	}
-	if s.selectUpstream != nil && (cmd == cmdConnect || cmd == cmdUDPAssociate) {
-		upstream, life := s.selectUpstream()
+	var observe func(bool, int64, time.Duration, time.Time)
+	if (s.selectUpstream != nil || s.selectObserved != nil) && (cmd == cmdConnect || cmd == cmdUDPAssociate) {
+		var upstream *Server
+		var life context.Context
+		if s.selectObserved != nil {
+			upstream, life, observe = s.selectObserved(cmd == cmdConnect)
+		} else {
+			upstream, life = s.selectUpstream()
+		}
 		if upstream == nil || life.Err() != nil {
 			writeReply(c, replyHostUnreachable)
 			return
@@ -126,7 +140,7 @@ func (s *Server) handle(ctx context.Context, c net.Conn) {
 	}
 	switch cmd {
 	case cmdConnect:
-		s.handleConnect(ctx, c, dst)
+		s.handleConnect(ctx, c, dst, observe)
 	case cmdUDPAssociate:
 		s.handleUDPAssociate(ctx, c, dst)
 	default:
@@ -134,7 +148,7 @@ func (s *Server) handle(ctx context.Context, c net.Conn) {
 	}
 }
 
-func (s *Server) handleConnect(ctx context.Context, c net.Conn, dst target) {
+func (s *Server) handleConnect(ctx context.Context, c net.Conn, dst target, observe func(bool, int64, time.Duration, time.Time)) {
 	upstream, err := s.dial(ctx, "tcp", dst.String())
 	if err != nil {
 		writeReply(c, replyHostUnreachable)
@@ -146,16 +160,91 @@ func (s *Server) handleConnect(ctx context.Context, c net.Conn, dst target) {
 	if err := writeReply(c, replySucceeded); err != nil {
 		return
 	}
+	if observe == nil {
+		done := make(chan struct{}, 2)
+		go func() { _, _ = io.Copy(upstream, c); done <- struct{}{} }()
+		go func() { _, _ = io.Copy(c, upstream); done <- struct{}{} }()
+		<-done
+		return
+	}
 	done := make(chan struct{}, 2)
-	go func() {
-		io.Copy(upstream, c)
-		done <- struct{}{}
-	}()
-	go func() {
-		io.Copy(c, upstream)
-		done <- struct{}{}
-	}()
+	ctx, stopCopies := context.WithCancel(ctx)
+	defer stopCopies()
+	observeLive := func(up bool, n int64, duration time.Duration, at time.Time) {
+		if ctx.Err() == nil {
+			observe(up, n, duration, at)
+		}
+	}
+	go func() { copyObserved(upstream, c, true, observeLive); done <- struct{}{} }()
+	go func() { copyObserved(c, upstream, false, observeLive); done <- struct{}{} }()
+	// The first completed direction ends the session, as for unobserved flows.
 	<-done
+}
+
+func copyObserved(dst io.Writer, src io.Reader, upload bool, observe func(bool, int64, time.Duration, time.Time)) {
+	r := &transferReader{Reader: src, upload: upload}
+	w := &transferWriter{Writer: dst, reader: r}
+	n, err := io.Copy(w, r)
+	if err == nil && !r.idle && n > 0 {
+		duration := r.duration
+		if upload {
+			duration += w.duration
+		}
+		// A lone long gap is indistinguishable from an idle application;
+		// repeated stalls still contribute to a sustained download sample.
+		if !upload && r.maxGap > time.Second && duration < 2*r.maxGap {
+			return
+		}
+		observe(upload, n, duration, r.lastPayload)
+	}
+}
+
+// Upload pauses may be application think time. Download gaps can instead be
+// carrier stalls and must remain in the measured interval.
+type transferReader struct {
+	io.Reader
+	upload            bool
+	last, lastPayload time.Time
+	duration          time.Duration
+	maxGap            time.Duration
+	idle              bool
+}
+
+func (r *transferReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if n > 0 {
+		now := time.Now()
+		if !r.last.IsZero() {
+			d := now.Sub(r.last)
+			if d > r.maxGap {
+				r.maxGap = d
+			}
+			if r.upload && d > time.Second {
+				r.idle = true
+			}
+			r.duration += d
+		}
+		r.last, r.lastPayload = now, now
+	}
+	return n, err
+}
+
+type transferWriter struct {
+	io.Writer
+	reader   *transferReader
+	duration time.Duration
+}
+
+func (w *transferWriter) Write(p []byte) (int, error) {
+	start := time.Now()
+	n, err := w.Writer.Write(p)
+	d := time.Since(start)
+	w.duration += d
+	w.reader.last = w.reader.last.Add(d)
+	if n > 0 {
+		w.reader.lastPayload = time.Now()
+	}
+	return n, err
 }
 
 // Loopback has negligible bandwidth-delay product. Large autotuned buffers

@@ -147,13 +147,18 @@ transports, never the selected Internet route. It does not balance ordinary TUN 
 In **Failover** and **Adaptive**, highlight a tunnel and press **-** to move
 it up or **+** (or the unshifted **=** key) to move it down. Failover takes
 the first reachable checked tunnel. Adaptive uses the order to choose among
-paths whose scores differ by less than its switching threshold. A working
-path switches only after the same alternative scores at least 5 ms and 15%
-better on two consecutive probes. An unavailable path is replaced without
-this wait. A closed BitTorrent carrier is excluded immediately, and
-its replacement needs a fresh successful probe. Native AWG/WG still relies
-on background probes to detect loss of reachability. SOCKS5 requests do not
-run or wait for additional checks.
+paths whose scores differ by less than its switching threshold. Adaptive
+checks reachability and connection setup time and also learns upload and
+download goodput separately from completed SOCKS5 TCP transfers. In the
+absence of comparable recent transfers, it uses the latency threshold
+(5 ms and 15%). A reachable alternative must stay better for two of its
+probes before it becomes the preferred path. Adaptive occasionally routes
+a new TCP connection through another reachable path to learn its speed;
+it does not generate benchmark traffic or move existing connections. The
+Adaptive dashboard row shows the currently preferred tunnel. An unavailable
+path is replaced without waiting for two probes. A replacement BitTorrent
+carrier needs a fresh successful probe; native AWG/WG still relies on the
+background probes to detect loss of reachability.
 
 Balancers test the tunnel against the hub's overlay control port (1054/TCP),
 or the overlay DNS port (1053/TCP) on an older hub. No external website or
@@ -215,6 +220,13 @@ route. A conflicting LAN or VPN prefix is an error; fix the overlap before
 starting the real-TUN client. The TUI, SOCKS5 ports, balance pools and peer
 menus are shared with Linux. **View service logs** shows the Windows Application
 event log entries for `btawg-client`.
+
+Windows carrier sockets keep their selected physical interface between route
+changes; btawg revalidates the selection when Windows reports network changes.
+The userspace SOCKS packet pump waits when its transport queue is full. If
+the upstream link queue also fills, it reports backpressure to the IP stack
+instead of silently accepting another packet. The Adaptive details screen
+shows cumulative queue saturation events since service start, once nonzero.
 
 If service startup reports a SOCKS5 bind conflict on Windows, identify the
 process listening on the reported TCP port (for example, `1080`):
@@ -574,9 +586,11 @@ application goodput, not link rate.
 | `req-tcp` | 2.236 | 2.256 | 2.222 | 2.204 |
 | `req-utp` | 1.349 | 1.375 | 1.308 | 1.303 |
 
-All values are in Gbit/s. The Linux IPv4 µTP path batches UDP I/O and uses
-UDP segmentation when available, without changing individual wire datagrams.
-These numbers do not describe a physical 1 GbE link or public WAN path.
+All values are in Gbit/s. Linux batches IPv4 µTP sends and receives. Windows
+batches eligible outgoing µTP datagrams with UDP segmentation when supported
+and otherwise sends ordinary datagrams. Segmentation does not change wire
+datagram boundaries. The figures above are Linux results; they do not
+describe a physical 1 GbE link, public WAN path, or Windows throughput.
 
 ### Two-VPS WAN measurement
 

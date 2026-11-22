@@ -14,12 +14,14 @@ import (
 )
 
 const (
-	failoverPolicy   = "failover"
-	roundRobinPolicy = "round-robin"
-	adaptivePolicy   = "adaptive"
-	probeInterval    = 5 * time.Second
-	probeTimeout     = 3 * time.Second
-	adaptiveMinGain  = 5 * time.Millisecond
+	failoverPolicy          = "failover"
+	roundRobinPolicy        = "round-robin"
+	adaptivePolicy          = "adaptive"
+	probeInterval           = 5 * time.Second
+	probeTimeout            = 3 * time.Second
+	adaptiveMinGain         = 5 * time.Millisecond
+	adaptiveSampleAge       = 2 * time.Minute
+	adaptiveExploreInterval = 30 * time.Second
 )
 
 var balancerPolicies = [...]string{failoverPolicy, roundRobinPolicy, adaptivePolicy}
@@ -60,6 +62,12 @@ type balancer struct {
 	paths               []*managedTunnel
 	next                int
 	current, challenger adaptivePath
+	samples             map[adaptivePath][2]throughputSample
+	route               adaptiveRoute
+	routeSet            bool
+	routeEpoch          uint64
+	explored            time.Time
+	exploreNext         int
 }
 
 func (b *balancer) replace(paths []*managedTunnel) {
@@ -67,6 +75,7 @@ func (b *balancer) replace(paths []*managedTunnel) {
 	defer b.mu.Unlock()
 	if b.policy == adaptivePolicy && !slices.Equal(b.paths, paths) {
 		b.current, b.challenger = adaptivePath{}, adaptivePath{}
+		b.samples = nil
 	}
 	b.paths = paths
 	if b.next >= len(paths) {
@@ -74,9 +83,104 @@ func (b *balancer) replace(paths []*managedTunnel) {
 	}
 }
 
+type throughputSample struct {
+	rate float64
+	at   time.Time
+}
+
+// setRouteLocked is used only while b.mu is held.
+func (b *balancer) setRouteLocked(route adaptiveRoute) {
+	if !b.routeSet || b.route != route {
+		b.routeEpoch++
+		b.route, b.routeSet = route, true
+		b.samples = nil
+		b.current, b.challenger = adaptivePath{}, adaptivePath{}
+		b.explored = time.Time{}
+	}
+}
+
+func (b *balancer) recordScoped(path adaptivePath, upload bool, bytes int64, duration time.Duration, now time.Time, epoch uint64) {
+	if bytes < 1<<20 || duration < time.Second {
+		return
+	}
+	if time.Since(now) > adaptiveSampleAge {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.routeEpoch != epoch {
+		return
+	}
+	if path.tunnel == nil {
+		return
+	}
+	if current, score := path.tunnel.adaptiveScore(); current != path || score <= 0 || !slices.Contains(b.paths, path.tunnel) {
+		return
+	}
+	if b.samples == nil {
+		b.samples = make(map[adaptivePath][2]throughputSample)
+	}
+	for old, samples := range b.samples {
+		if current, _ := old.tunnel.adaptiveScore(); current != old || (now.Sub(samples[0].at) > adaptiveSampleAge && now.Sub(samples[1].at) > adaptiveSampleAge) {
+			delete(b.samples, old)
+		}
+	}
+	samples := b.samples[path]
+	i := 1
+	if upload {
+		i = 0
+	}
+	if samples[i].at.After(now) {
+		return
+	}
+	samples[i] = throughputSample{rate: float64(bytes) / duration.Seconds(), at: now}
+	b.samples[path] = samples
+}
+
+// throughputBetter only compares directions observed on both live paths.
+func (b *balancer) throughputBetter(best, current adaptivePath, now time.Time) bool {
+	a, c := b.samples[best], b.samples[current]
+	better := false
+	for i := range a {
+		if a[i].rate == 0 || c[i].rate == 0 || now.Sub(a[i].at) > adaptiveSampleAge || now.Sub(c[i].at) > adaptiveSampleAge {
+			continue
+		}
+		if a[i].rate*2 < c[i].rate {
+			return false
+		}
+		if a[i].rate > c[i].rate*2 {
+			better = true
+		}
+	}
+	return better
+}
+
+func (b *balancer) pickTCPLocked() *managedTunnel {
+	current := b.pickLocked()
+	if current == nil || b.policy != adaptivePolicy {
+		return current
+	}
+	if time.Since(b.explored) < adaptiveExploreInterval {
+		return current
+	}
+	for i := range len(b.paths) {
+		idx := (b.exploreNext + i) % len(b.paths)
+		path, score := b.paths[idx].adaptiveScore()
+		if score > 0 && path.tunnel != current {
+			b.explored, b.exploreNext = time.Now(), idx+1
+			return path.tunnel
+		}
+	}
+	return current
+}
+
 func (b *balancer) pick() *managedTunnel {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	return b.pickLocked()
+}
+
+func (b *balancer) pickLocked() *managedTunnel {
 	if b.policy == adaptivePolicy {
 		if b.current.tunnel != nil {
 			if path, score := b.current.tunnel.adaptiveScore(); path == b.current && score > 0 {
@@ -141,8 +245,30 @@ func (b *balancer) probed(tunnel *managedTunnel, carrier *carrierHealth) {
 		b.current, b.challenger = adaptivePath{}, adaptivePath{}
 		return
 	}
-	best, score := b.bestAdaptive()
-	if best.tunnel == nil || !adaptiveImprovement(score, currentScore) {
+	var best adaptivePath
+	var score time.Duration
+	now := time.Now()
+	// Prefer a demonstrably faster path, then consider every eligible latency
+	// challenger except paths demonstrably slower than the incumbent.
+	for _, tunnel := range b.paths {
+		path, candidateScore := tunnel.adaptiveScore()
+		if candidateScore > 0 && path != current && b.throughputBetter(path, current, now) {
+			best, score = path, candidateScore
+			break
+		}
+	}
+	if best.tunnel == nil {
+		for _, tunnel := range b.paths {
+			path, candidateScore := tunnel.adaptiveScore()
+			if candidateScore <= 0 || path == current || b.throughputBetter(current, path, now) || !adaptiveImprovement(candidateScore, currentScore) {
+				continue
+			}
+			if best.tunnel == nil || adaptiveImprovement(candidateScore, score) {
+				best, score = path, candidateScore
+			}
+		}
+	}
+	if best.tunnel == nil || (!b.throughputBetter(best, current, time.Now()) && !adaptiveImprovement(score, currentScore)) {
 		b.challenger = adaptivePath{}
 		return
 	}

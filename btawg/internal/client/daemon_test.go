@@ -116,3 +116,19 @@ func TestDaemonControlToggleRotatePersist(t *testing.T) {
 		t.Fatal("show did not return current credentials")
 	}
 }
+
+func TestControlStatusReportsAdaptiveSelection(t *testing.T) {
+	var tunnel managedTunnel
+	tunnel.c = &Client{cfg: config.ClientConfig{Transport: config.ModeWG}}
+	tunnel.score.Store(int64(20 * time.Millisecond))
+	m := &Managed{}
+	m.applyRoutes(nil)
+	b := &m.balance[2]
+	b.policy = adaptivePolicy
+	b.replace([]*managedTunnel{&tunnel})
+	b.pick()
+	d := clientControl{m: m}
+	if got := d.handle(ControlRequest{Op: "status"}).AdaptiveMode; got != config.ModeWG {
+		t.Fatalf("adaptive selection = %q", got)
+	}
+}
