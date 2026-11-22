@@ -84,6 +84,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -96,11 +99,15 @@ jobs:
           set -eu
           actual=$(sha256sum btawg-client-windows-amd64.zip | cut -d' ' -f1)
           test "$actual" = "$WINDOWS_11_VERIFIED_SHA256"
-      - name: verify all six release assets
+      - name: package desktop launcher
+        run: |
+          python3 -m zipfile -c dist/btawg-desktop-launcher.zip btawg/scripts/start-btawg-client.cmd btawg/scripts/start-btawg-client.ps1
+          (cd dist && sha256sum btawg-desktop-launcher.zip > SHA256SUMS.launcher)
+      - name: verify all release assets
         working-directory: dist
         run: |
-          cat SHA256SUMS.linux-amd64 SHA256SUMS.linux-arm64 SHA256SUMS.windows-amd64 SHA256SUMS.windows-arm64 > SHA256SUMS
-          diff -u <(printf '%s\n' btawg-client-linux-amd64 btawg-client-linux-arm64 btawg-client-windows-amd64.zip btawg-client-windows-arm64.zip btawg-server-linux-amd64 btawg-server-linux-arm64) <(awk '{print $2}' SHA256SUMS | sort)
+          cat SHA256SUMS.linux-amd64 SHA256SUMS.linux-arm64 SHA256SUMS.windows-amd64 SHA256SUMS.windows-arm64 SHA256SUMS.launcher > SHA256SUMS
+          diff -u <(printf '%s\n' btawg-client-linux-amd64 btawg-client-linux-arm64 btawg-client-windows-amd64.zip btawg-client-windows-arm64.zip btawg-desktop-launcher.zip btawg-server-linux-amd64 btawg-server-linux-arm64) <(awk '{print $2}' SHA256SUMS | sort)
           sha256sum --strict -c SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
@@ -111,6 +118,7 @@ jobs:
             dist/btawg-client-linux-arm64
             dist/btawg-client-windows-amd64.zip
             dist/btawg-client-windows-arm64.zip
+            dist/btawg-desktop-launcher.zip
             dist/SHA256SUMS
           fail_on_unmatched_files: true
           generate_release_notes: true

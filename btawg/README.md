@@ -183,8 +183,9 @@ sudo ./btawg-client 'btawg://…'      # one mode, btawg0 interface
 | Windows 11 amd64 | `btawg-client-windows-amd64.zip` | — |
 | Windows 11 arm64 | `btawg-client-windows-arm64.zip` | — |
 
-`SHA256SUMS` covers all six assets. On Linux, install the binary under the
-usual `btawg-client` or `btawg-server` name regardless of architecture.
+`SHA256SUMS` covers the binaries and the Windows desktop launcher ZIP. On
+Linux, install the binary under the usual `btawg-client` or `btawg-server`
+name regardless of architecture.
 
 ### Windows 11 client
 
@@ -194,6 +195,14 @@ and `Wintun-LICENSE.txt` together. From an elevated Windows Terminal, run
 as on Linux. For unattended setup, run `./btawg-client.exe install -import-file
 client.txt`. The native Windows service starts at boot and works without the
 terminal. **Remove service** leaves your configuration and installed bundle.
+
+After installing the service, extract both files from
+`btawg-desktop-launcher.zip` onto your desktop. Double-click
+`start-btawg-client.cmd` and approve the UAC prompt to open the installed
+dashboard. Keep `start-btawg-client.ps1` next to it. The launcher finds the
+current installed executable after updates; it does not restart the service.
+If Windows blocks the downloaded `.ps1`, review it, then use the **Unblock**
+checkbox in its file properties.
 
 In the **VPN import** field, press **Ctrl+V** or **F2** to paste from the
 Windows clipboard. The import stays hidden; only its length is shown. In
