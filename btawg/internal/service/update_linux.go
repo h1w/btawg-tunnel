@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 func (u Unit) updateLockPath() string { return u.binaryPath() + ".update.lock" }
 
 func (u Unit) applyRelease(ctx context.Context, client *http.Client, tag string, progress func(string)) error {
 	base := assetBase + tag + "/"
-	name := u.binaryName()
+	name := u.releaseAsset(runtime.GOOS, runtime.GOARCH)
 	progress("Fetching SHA-256 checksum…")
 	want, err := releaseChecksum(ctx, client, base, name)
 	if err != nil {

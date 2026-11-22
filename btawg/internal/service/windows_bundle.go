@@ -7,9 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 )
-
-const windowsReleaseAsset = "btawg-client-windows-amd64.zip"
 
 var windowsBundleFiles = [...]string{"btawg-client.exe", "wintun.dll", "Wintun-LICENSE.txt"}
 
@@ -54,10 +53,17 @@ func unpackWindowsBundle(archive, dest string) error {
 	return nil
 }
 
-// Digest of wintun/bin/amd64/wintun.dll from the verified Wintun 0.14.1 archive.
-const winDriverSHA256 = "e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce"
-
 func verifyWindowsDriver(path string) error {
+	// Digests from the verified Wintun 0.14.1 archive, selected by binary architecture.
+	var want string
+	switch runtime.GOARCH {
+	case "amd64":
+		want = "e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce"
+	case "arm64":
+		want = "f7ba89005544be9d85231a9e0d5f23b2d15b3311667e2dad0debd344918a3f80"
+	default:
+		return fmt.Errorf("no pinned Wintun driver for %s", runtime.GOARCH)
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -68,8 +74,8 @@ func verifyWindowsDriver(path string) error {
 	if err != nil {
 		return err
 	}
-	if n > maxAssetSize || fmt.Sprintf("%x", h.Sum(nil)) != winDriverSHA256 {
-		return fmt.Errorf("wintun.dll is not the pinned amd64 release driver")
+	if n > maxAssetSize || fmt.Sprintf("%x", h.Sum(nil)) != want {
+		return fmt.Errorf("wintun.dll is not the pinned %s release driver", runtime.GOARCH)
 	}
 	return nil
 }

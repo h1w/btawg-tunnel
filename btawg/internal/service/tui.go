@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -65,7 +66,7 @@ func TUI(menu Menu) error {
 		d.message = platformUpdateNotice()
 	}
 	var notices chan string
-	if menu.Unit == Client && releaseSupported() {
+	if menu.Unit == Client && menu.Unit.releaseAsset(runtime.GOOS, runtime.GOARCH) != "" {
 		notices = make(chan string, 1)
 		d.releaseNotices = notices
 	}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -25,8 +26,9 @@ func (u Unit) applyRelease(ctx context.Context, client *http.Client, tag string,
 		return fmt.Errorf("no Windows release for %s", u)
 	}
 	base := assetBase + tag + "/"
+	name := u.releaseAsset(runtime.GOOS, runtime.GOARCH)
 	progress("Fetching SHA-256 checksum…")
-	want, err := releaseChecksum(ctx, client, base, windowsReleaseAsset)
+	want, err := releaseChecksum(ctx, client, base, name)
 	if err != nil {
 		return fmt.Errorf("get release checksum: %w", err)
 	}
@@ -44,8 +46,8 @@ func (u Unit) applyRelease(ctx context.Context, client *http.Client, tag string,
 			_ = os.RemoveAll(bundle)
 		}
 	}()
-	archive := filepath.Join(bundle, windowsReleaseAsset)
-	if err := downloadBinary(ctx, client, base+windowsReleaseAsset, archive, want, progress); err != nil {
+	archive := filepath.Join(bundle, name)
+	if err := downloadBinary(ctx, client, base+name, archive, want, progress); err != nil {
 		return err
 	}
 	if err := unpackWindowsBundle(archive, bundle); err != nil {

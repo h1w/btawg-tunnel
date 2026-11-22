@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -38,7 +39,12 @@ func TestUpdateFromRelease(t *testing.T) {
 			oldBinDir, oldRunner := binDir, systemctlRunner
 			binDir = t.TempDir()
 			t.Cleanup(func() { binDir, systemctlRunner = oldBinDir, oldRunner })
-			path := filepath.Join(binDir, "btawg-"+string(tc.unit))
+			name := "btawg-" + string(tc.unit)
+			path := filepath.Join(binDir, name)
+			assetName := name
+			if runtime.GOARCH == "arm64" {
+				assetName += "-linux-arm64"
+			}
 			if err := os.WriteFile(path, []byte(tc.installed), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -70,8 +76,8 @@ func TestUpdateFromRelease(t *testing.T) {
 				case "/repos/h1w/btawg-tunnel/releases/latest":
 					fmt.Fprintf(w, `{"tag_name":%q}`, tc.tag)
 				case base + "SHA256SUMS":
-					fmt.Fprintf(w, "%x  dist/btawg-%s\n", sha256.Sum256([]byte(next)), tc.unit)
-				case base + "btawg-" + string(tc.unit):
+					fmt.Fprintf(w, "%x  dist/%s\n", sha256.Sum256([]byte(next)), assetName)
+				case base + assetName:
 					fmt.Fprint(w, tc.asset)
 				default:
 					http.NotFound(w, r)
@@ -84,7 +90,7 @@ func TestUpdateFromRelease(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			hc.Transport = updateRoundTrip(func(r *http.Request) (*http.Response, error) {
-				if r.URL.Path == "/h1w/btawg-tunnel/releases/download/"+tc.tag+"/btawg-"+string(tc.unit) {
+				if r.URL.Path == "/h1w/btawg-tunnel/releases/download/"+tc.tag+"/"+assetName {
 					downloaded = true
 				}
 				clone := r.Clone(r.Context())

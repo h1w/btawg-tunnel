@@ -33,12 +33,28 @@ type updateResult struct {
 	updated           bool
 }
 
-func releaseSupported() bool {
-	return runtime.GOARCH == "amd64" && (runtime.GOOS == "linux" || runtime.GOOS == "windows")
+func (u Unit) releaseAsset(goos, goarch string) string {
+	if goarch != "amd64" && goarch != "arm64" {
+		return ""
+	}
+	switch goos {
+	case "linux":
+		if u == Client || u == Server {
+			if goarch == "amd64" {
+				return u.binaryName()
+			}
+			return u.binaryName() + "-linux-arm64"
+		}
+	case "windows":
+		if u == Client {
+			return "btawg-client-windows-" + goarch + ".zip"
+		}
+	}
+	return ""
 }
 
 func (u Unit) updateScreen(ctx context.Context, progress func(string)) (*Screen, error) {
-	if !releaseSupported() {
+	if u.releaseAsset(runtime.GOOS, runtime.GOARCH) == "" {
 		return nil, fmt.Errorf("no GitHub release binary for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)

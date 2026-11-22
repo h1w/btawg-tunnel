@@ -9,7 +9,17 @@ permissions:
 
 jobs:
   binaries:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      GOARCH: ${{ matrix.arch }}
     defaults:
       run:
         working-directory: btawg
@@ -21,21 +31,37 @@ jobs:
       - name: test before release
         run: go test ./... -count=1 -timeout 300s
       - name: build
+        env:
+          CGO_ENABLED: '0'
         run: |
+          test "$(go env GOHOSTARCH)" = "$GOARCH"
           version_flags="-s -w -X bittorrent-tunnel/btawg/internal/service.Version=${GITHUB_REF_NAME}"
-          CGO_ENABLED=0 go build -trimpath -ldflags "$version_flags" -o dist/btawg-server ./cmd/btawg-server
-          CGO_ENABLED=0 go build -trimpath -ldflags "$version_flags" -o dist/btawg-client ./cmd/btawg-client
-          test "$(dist/btawg-server --version)" = "$GITHUB_REF_NAME"
-          test "$(dist/btawg-client --version)" = "$GITHUB_REF_NAME"
-          sha256sum dist/btawg-server dist/btawg-client > dist/SHA256SUMS
+          mkdir -p dist
+          for kind in server client; do
+            name="btawg-$kind"
+            if [[ "$GOARCH" == arm64 ]]; then name+=-linux-arm64; fi
+            go build -trimpath -ldflags "$version_flags" -o "dist/$name" "./cmd/btawg-$kind"
+            test "$("dist/$name" --version)" = "$GITHUB_REF_NAME"
+            (cd dist && sha256sum "$name") >> "dist/SHA256SUMS.linux-$GOARCH"
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-binaries
+          name: linux-${{ matrix.arch }}
           path: btawg/dist/*
           if-no-files-found: error
 
   windows:
-    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      RELEASE_ARCH: ${{ matrix.arch }}
     defaults:
       run:
         working-directory: btawg
@@ -44,11 +70,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: btawg/go.mod
-      - run: ./scripts/package-windows.ps1 -Version $env:GITHUB_REF_NAME -OutDir dist
-      - run: ./scripts/test-windows.ps1 -Bundle dist/btawg-client-windows-amd64.zip
+      - run: ./scripts/package-windows.ps1 -Version $env:GITHUB_REF_NAME -OutDir dist -Architecture $env:RELEASE_ARCH
+      - run: ./scripts/test-windows.ps1 -Bundle "dist/btawg-client-windows-$env:RELEASE_ARCH.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-candidate
+          name: windows-${{ matrix.arch }}
           path: btawg/dist/*
           if-no-files-found: error
 
@@ -61,12 +87,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: linux-binaries
           path: dist
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-candidate
-          path: dist
+          merge-multiple: true
       - name: verify exact approved Windows bundle
         working-directory: dist
         env:
@@ -75,13 +97,21 @@ jobs:
           set -eu
           actual=$(sha256sum btawg-client-windows-amd64.zip | cut -d' ' -f1)
           test "$actual" = "$WINDOWS_11_VERIFIED_SHA256"
-          sha256sum -c SHA256SUMS.windows
-          cat SHA256SUMS.windows >> SHA256SUMS
+      - name: verify all six release assets
+        working-directory: dist
+        run: |
+          cat SHA256SUMS.linux-amd64 SHA256SUMS.linux-arm64 SHA256SUMS.windows-amd64 SHA256SUMS.windows-arm64 > SHA256SUMS
+          diff -u <(printf '%s\n' btawg-client btawg-client-linux-arm64 btawg-client-windows-amd64.zip btawg-client-windows-arm64.zip btawg-server btawg-server-linux-arm64) <(awk '{print $2}' SHA256SUMS | sort)
+          sha256sum --strict -c SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/btawg-server
             dist/btawg-client
+            dist/btawg-server-linux-arm64
+            dist/btawg-client-linux-arm64
             dist/btawg-client-windows-amd64.zip
+            dist/btawg-client-windows-arm64.zip
             dist/SHA256SUMS
+          fail_on_unmatched_files: true
           generate_release_notes: true

@@ -9,11 +9,12 @@ try {
     Expand-Archive -LiteralPath $Bundle -DestinationPath $stage
     $env:CGO_ENABLED = '0'
     $env:BTAWG_WINDOWS_NETWORK_TESTS = '1'
+    $env:BTAWG_WINDOWS_BUNDLE_DRIVER = Join-Path $stage 'wintun.dll'
     $targets = @{
         tunsetup = @('./internal/tunsetup', '^Test(WindowsClientTUN|OwnedAdapter|Underlay)');
         client = @('./internal/client', '^Test(Windows|Overlay|Daemon|Native|PeerUnderlay)');
         carrier = @('./internal/carrier', '^TestTCPControlCarriesDuplexTraffic$');
-        service = @('./internal/service', '^Test(WindowsManaged|WindowsBundle|UpdateLock|UpdateRecovery|UpdateActivation)');
+        service = @('./internal/service', '^Test(ReleaseAssetMatchesTarget|WindowsManaged|WindowsBundle|UpdateLock|UpdateRecovery|UpdateActivation)');
         cli = @('./cmd/btawg-client', '^TestPeer');
         portmap = @('./internal/portmap', '^TestGateway');
     }

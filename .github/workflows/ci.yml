@@ -45,6 +45,6 @@ jobs:
         with:
           go-version-file: btawg/go.mod
       - name: build Windows client bundle
-        run: ./scripts/package-windows.ps1 -Version v0.0.0 -OutDir dist
+        run: ./scripts/package-windows.ps1 -Version v0.0.0 -OutDir dist -Architecture amd64
       - name: test native Windows client surfaces
         run: ./scripts/test-windows.ps1 -Bundle dist/btawg-client-windows-amd64.zip
