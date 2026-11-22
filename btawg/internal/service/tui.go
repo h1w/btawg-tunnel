@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -19,11 +17,12 @@ import (
 // Menu is the operator interface for one managed service. Role-specific actions
 // share the same renderer, navigation, and operation queue as systemd actions.
 type Menu struct {
-	Unit     Unit
-	Subtitle string
-	Setup    func() (*Screen, error)
-	Install  func() (*Screen, error)
-	Actions  func(state string) ([]Action, error)
+	Unit                 Unit
+	Subtitle             string
+	Setup                func() (*Screen, error)
+	Install              func() (*Screen, error)
+	Actions              func(state string) ([]Action, error)
+	SetupRestartsService bool
 }
 
 type Action struct {
@@ -56,7 +55,15 @@ type Field struct {
 const updateActionLabel = "Update from GitHub"
 
 func TUI(menu Menu) error {
-	d := &dashboard{menu: menu, root: os.Geteuid() == 0, results: make(chan update, 1)}
+	restore, err := prepareDashboardConsole()
+	if err != nil {
+		return err
+	}
+	defer restore()
+	d := &dashboard{menu: menu, root: Privileged(), results: make(chan update, 1)}
+	if menu.Unit == Client && d.root {
+		d.message = platformUpdateNotice()
+	}
 	var notices chan string
 	if menu.Unit == Client && releaseSupported() {
 		notices = make(chan string, 1)
@@ -289,7 +296,7 @@ func (d *dashboard) actions() []Action {
 		if s.state != NotInstalled {
 			out = append(out,
 				Action{Label: updateActionLabel, Confirm: "Download the latest release directly? A running service will restart."},
-				Action{Label: "Remove service", Confirm: "Stop and remove the systemd service? Configuration, keys, and the installed launcher are kept.", Run: perform(u.Uninstall)},
+				Action{Label: "Remove service", Confirm: "Stop and remove the service? Configuration, keys, and the installed launcher are kept.", Run: perform(u.Uninstall)},
 			)
 		}
 	}
@@ -308,7 +315,7 @@ func (d *dashboard) settings() (*Screen, error) {
 			return nil, nil
 		}
 		next, err := save(fields)
-		if err != nil {
+		if err != nil || d.menu.SetupRestartsService {
 			return next, err
 		}
 		state, _, err := unit.State()
@@ -316,7 +323,7 @@ func (d *dashboard) settings() (*Screen, error) {
 			return next, fmt.Errorf("settings saved; check service state: %w", err)
 		}
 		if state == "active" || state == "activating" || state == "reloading" {
-			if err := unitAction(unit.unitName(), "try-restart"); err != nil {
+			if err := unit.Control("try-restart"); err != nil {
 				return next, fmt.Errorf("settings saved; restart failed: %w", err)
 			}
 		}
@@ -339,16 +346,6 @@ func (d *dashboard) syncInputMode(term tui.Terminal) {
 	} else {
 		term.EnableMouse()
 	}
-}
-
-func (u Unit) logs() (*Screen, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "journalctl", "-u", u.unitName(), "-n", "50", "--no-pager", "-o", "short-iso").CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("journalctl: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	return &Screen{Title: "Service logs (last 50 entries)", Text: strings.TrimSpace(string(out))}, nil
 }
 
 func (d *dashboard) activate() {

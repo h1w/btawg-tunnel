@@ -53,18 +53,36 @@ func verifiedRouterURL(u *url.URL, gateway netip.Addr) bool {
 }
 
 func (r router) igdHTTP() *http.Client {
-	dial := net.Dialer{LocalAddr: net.TCPAddrFromAddrPort(netip.AddrPortFrom(r.source, 0))}
+	dial := net.Dialer{LocalAddr: net.TCPAddrFromAddrPort(netip.AddrPortFrom(r.source, 0)), Control: r.socketControl}
 	return &http.Client{
 		Timeout: httpTimeout,
 		Transport: &http.Transport{
 			// Do not use the process's proxy settings for local router control.
-			DialContext:            dial.DialContext,
+			DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+				c, err := dial.DialContext(ctx, network, address)
+				if err != nil {
+					return nil, err
+				}
+				return &gatewayConn{Conn: c, router: r}, nil
+			},
 			DisableCompression:     true,
 			DisableKeepAlives:      true,
 			MaxResponseHeaderBytes: 16 << 10,
 		},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
+}
+
+type gatewayConn struct {
+	net.Conn
+	router router
+}
+
+func (c *gatewayConn) Write(p []byte) (int, error) {
+	if err := c.router.validateSnapshot(); err != nil {
+		return 0, err
+	}
+	return c.Conn.Write(p)
 }
 
 func ssdpLocation(packet []byte) string {
@@ -132,7 +150,13 @@ func (r router) discoverIGD(parent context.Context) ([]igdService, error) {
 			return nil, err
 		}
 	}
+	if err := r.validateSnapshot(); err != nil {
+		return nil, err
+	}
 	for _, target := range [...]string{igdDevice + "2", igdDevice + "1", "upnp:rootdevice"} {
+		if err := r.validateSnapshot(); err != nil {
+			return nil, err
+		}
 		request := "M-SEARCH * HTTP/1.1\r\nHOST: " + r.ssdp.String() + "\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: " + target + "\r\n\r\n"
 		if _, err := conn.WriteToUDPAddrPort([]byte(request), r.ssdp); err != nil {
 			return nil, err

@@ -11,15 +11,11 @@ import (
 	"maps"
 	"net"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"slices"
 	"sync"
-	"syscall"
 	"time"
 
 	"bittorrent-tunnel/btawg/internal/config"
-	"bittorrent-tunnel/btawg/internal/service"
 )
 
 type ControlRequest struct {
@@ -62,11 +58,11 @@ type clientControl struct {
 	cfg  ManagedConfig
 }
 
-func RunManaged(ctx context.Context, cfg ManagedConfig, realTUN bool, tunName string) error {
-	return runManagedAt(ctx, cfg, ManagedConfigPath, ControlSocketPath, realTUN, tunName, ManagedPortBase)
+func RunManaged(ctx context.Context, cfg ManagedConfig, realTUN bool, tunName string, ready func() error) error {
+	return runManagedAt(ctx, cfg, ManagedConfigPath, ControlSocketPath, realTUN, tunName, ManagedPortBase, ready)
 }
 
-func runManagedAt(ctx context.Context, cfg ManagedConfig, cfgPath, socketPath string, realTUN bool, tunName string, portBase int) error {
+func runManagedAt(ctx context.Context, cfg ManagedConfig, cfgPath, socketPath string, realTUN bool, tunName string, portBase int, ready func() error) error {
 	if err := cfg.validatePeerSettings(realTUN); err != nil {
 		return err
 	}
@@ -78,20 +74,11 @@ func runManagedAt(ctx context.Context, cfg ManagedConfig, cfgPath, socketPath st
 	if err != nil || !listenIP.Is4() {
 		return fmt.Errorf("invalid SOCKS5 listen IPv4 address")
 	}
-	if err := os.MkdirAll(filepath.Dir(socketPath), 0700); err != nil {
-		return err
-	}
-	if err := os.Chmod(filepath.Dir(socketPath), 0700); err != nil {
-		return err
-	}
-	ln, err := net.ListenUnix("unix", &net.UnixAddr{Name: socketPath, Net: "unix"})
+	ln, err := listenControl(socketPath)
 	if err != nil {
 		return err
 	}
 	defer ln.Close()
-	if err := os.Chmod(socketPath, 0600); err != nil {
-		return err
-	}
 	m, err := newManagedWithPeer(ctx, importCfg, cfg.Enabled, listenIP, cfg.Credentials, realTUN, tunName, portBase, cfg.Balancers, cfg.Routes, cfg.P2P, cfg.Peer)
 	if err != nil {
 		return err
@@ -115,8 +102,10 @@ func runManagedAt(ctx context.Context, cfg ManagedConfig, cfgPath, socketPath st
 	m.applyRoutes(cfg.Routes)
 	m.startNetwork(cfg.P2P, cfg.AutoMap, cfg.AllowPermanentUPnP, cfg.ServeEgress, cfg.PeerPort, cfg.PeerEndpoint, cfg.PeerTCPEndpoint)
 	d := &clientControl{m: m, path: cfgPath, cfg: cfg}
-	if err := service.NotifyReady(); err != nil {
-		return err
+	if ready != nil {
+		if err := ready(); err != nil {
+			return err
+		}
 	}
 	stop := context.AfterFunc(ctx, func() { ln.Close() })
 	defer stop()
@@ -314,11 +303,8 @@ var ErrNotRunning = errors.New("btawg-client control socket is not listening")
 
 func request(path string, req ControlRequest) (ControlResponse, error) {
 	var r ControlResponse
-	c, err := net.DialTimeout("unix", path, time.Second)
+	c, err := dialControl(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) {
-			return r, ErrNotRunning
-		}
 		return r, err
 	}
 	defer c.Close()

@@ -16,7 +16,7 @@ func (n *meshNode) servePeerProbe() {
 		return
 	}
 	ip := netip.MustParseAddr(n.owner.cfg.ClientIP)
-	lc := net.ListenConfig{Control: tunsetup.BindDevice(n.owner.shared.name)}
+	lc := net.ListenConfig{Control: tunsetup.BindOwnedDevice(n.owner.shared.dev, n.owner.shared.name)}
 	ln, err := lc.Listen(n.ctx, "tcp4", netip.AddrPortFrom(ip, mesh.PeerProbePort).String())
 	if err != nil {
 		if n.ctx.Err() == nil {
@@ -38,7 +38,12 @@ func (n *meshNode) servePeerProbe() {
 
 func (n *meshNode) probeDirect(ctx context.Context, p *tunPath, ip netip.Addr) {
 	var c Client
-	p.proxySockets(&c, netip.MustParseAddr(n.owner.cfg.ClientIP))
+	if err := p.proxySockets(&c, netip.MustParseAddr(n.owner.cfg.ClientIP)); err != nil {
+		if ctx.Err() == nil {
+			log.Printf("btawg-client: peer probe sockets: %v", err)
+		}
+		return
+	}
 	addr := netip.AddrPortFrom(ip, mesh.PeerProbePort)
 	tick := time.NewTicker(probeInterval)
 	defer tick.Stop()

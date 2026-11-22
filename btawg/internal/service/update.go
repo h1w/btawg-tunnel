@@ -7,20 +7,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 // Version is set to the release tag by the GitHub build.
@@ -38,12 +34,12 @@ type updateResult struct {
 }
 
 func releaseSupported() bool {
-	return runtime.GOOS == "linux" && runtime.GOARCH == "amd64"
+	return runtime.GOARCH == "amd64" && (runtime.GOOS == "linux" || runtime.GOOS == "windows")
 }
 
 func (u Unit) updateScreen(ctx context.Context, progress func(string)) (*Screen, error) {
 	if !releaseSupported() {
-		return nil, fmt.Errorf("GitHub release binaries are only available for Linux amd64")
+		return nil, fmt.Errorf("no GitHub release binary for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
@@ -55,7 +51,14 @@ func (u Unit) updateScreen(ctx context.Context, progress func(string)) (*Screen,
 	}
 	text := fmt.Sprintf("Installed: %s\nLatest GitHub release: %s\n\nNo update needed.", result.installed, result.latest)
 	if result.updated {
-		text = fmt.Sprintf("Updated %s → %s.\n\nReopen the TUI to use the new version.", result.installed, result.latest)
+		if runtime.GOOS == "windows" {
+			text = fmt.Sprintf("Update %s → %s handed to the Windows activation helper. The result is pending; reopen the TUI to see it.", result.installed, result.latest)
+		} else {
+			text = fmt.Sprintf("Updated %s → %s.\n\nReopen the TUI to use the new version.", result.installed, result.latest)
+		}
+	}
+	if notice := platformUpdateNotice(); notice != "" {
+		text += "\n\n" + notice
 	}
 	return &Screen{Title: "GitHub update", Text: text}, nil
 }
@@ -84,13 +87,15 @@ func directUpdateClient() *http.Client {
 
 func (u Unit) updateFrom(ctx context.Context, client *http.Client, progress func(string)) (updateResult, error) {
 	var result updateResult
-	path := u.binaryPath()
-	lock, err := os.OpenFile(path+".update.lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err := prepareUpdateLock(u.updateLockPath()); err != nil {
+		return result, err
+	}
+	lock, err := os.OpenFile(u.updateLockPath(), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return result, fmt.Errorf("open update lock: %w", err)
 	}
 	defer lock.Close()
-	if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+	if err := lockUpdate(lock); err != nil {
 		return result, fmt.Errorf("lock update: %w", err)
 	}
 	progress("Checking latest release…")
@@ -184,58 +189,6 @@ func getReleaseFile(ctx context.Context, client *http.Client, url string) (*http
 		return nil, fmt.Errorf("GitHub returned %s", res.Status)
 	}
 	return res, nil
-}
-
-func (u Unit) applyRelease(ctx context.Context, client *http.Client, tag string, progress func(string)) error {
-	base := assetBase + tag + "/"
-	name := u.binaryName()
-	progress("Fetching SHA-256 checksum…")
-	want, err := releaseChecksum(ctx, client, base, name)
-	if err != nil {
-		return fmt.Errorf("get release checksum: %w", err)
-	}
-
-	path := u.binaryPath()
-	dir, err := os.MkdirTemp(filepath.Dir(path), ".btawg-update-")
-	if err != nil {
-		return fmt.Errorf("stage update: %w", err)
-	}
-	keepBackup := false
-	defer func() {
-		if !keepBackup {
-			os.RemoveAll(dir)
-		}
-	}()
-	staged := filepath.Join(dir, name)
-	if err := downloadBinary(ctx, client, base+name, staged, want, progress); err != nil {
-		return fmt.Errorf("download %s %s: %w", name, tag, err)
-	}
-	backup := filepath.Join(dir, "previous")
-	if err := os.Link(path, backup); err != nil {
-		return fmt.Errorf("back up installed binary: %w", err)
-	}
-	// Cancellation is safe up to this point. Once the executable is replaced,
-	// finish the restart or rollback even if the dashboard is closing.
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	progress("Installing verified binary…")
-	if err := os.Rename(staged, path); err != nil {
-		return fmt.Errorf("replace installed binary: %w", err)
-	}
-	progress("Restarting service if running…")
-	if err := unitAction(u.unitName(), "try-restart"); err != nil {
-		progress("Restoring previous version…")
-		if restoreErr := os.Rename(backup, path); restoreErr != nil {
-			keepBackup = true
-			return errors.Join(err, fmt.Errorf("restore previous binary (backup at %s): %w", backup, restoreErr))
-		}
-		if restartErr := u.Control("restart"); restartErr != nil {
-			return errors.Join(err, fmt.Errorf("previous binary restored, but service restart failed: %w", restartErr))
-		}
-		return fmt.Errorf("previous version restored after restart failed: %w", err)
-	}
-	return nil
 }
 
 func releaseChecksum(ctx context.Context, client *http.Client, base, name string) ([]byte, error) {

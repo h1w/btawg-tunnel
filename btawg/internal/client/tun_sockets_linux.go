@@ -13,6 +13,10 @@ import (
 	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
+const windowsAssemblesIngress = false
+
+func (p *tunPath) inboundPacket(packet []byte) []byte { return packet }
+
 // Register the bound source port before TCP connect can send its first SYN.
 // Binding explicitly without SO_REUSEADDR reserves the port for this socket.
 func (p *tunPath) bindTCP(ctx context.Context, network string, raw syscall.RawConn, source [4]byte, key *localPort) error {
@@ -88,7 +92,7 @@ func (s *sharedTUN) pruneSockets() {
 	}
 }
 
-func (p *tunPath) proxySockets(c *Client, source netip.Addr) {
+func (p *tunPath) proxySockets(c *Client, source netip.Addr) error {
 	c.proxyTCP = func(ctx context.Context, dst netip.AddrPort) (net.Conn, error) {
 		key := localPort{proto: unix.IPPROTO_TCP, remote: dst}
 		owner := &socketPath{path: p}
@@ -120,6 +124,11 @@ func (p *tunPath) proxySockets(c *Client, source netip.Addr) {
 		}
 		return &trackedUDP{PacketConn: conn, shared: p.shared, key: key, owner: owner}, nil
 	}
+	return nil
+}
+
+func (p *tunPath) deliverPackets(bufs [][]byte, offset int) (int, error) {
+	return p.shared.dev.Write(bufs, offset)
 }
 
 type trackedTCP struct {

@@ -11,6 +11,7 @@ import (
 
 	"bittorrent-tunnel/btawg/internal/carrier"
 	"bittorrent-tunnel/btawg/internal/config"
+	"bittorrent-tunnel/btawg/internal/tunsetup"
 
 	"github.com/anacrolix/go-utp/purego"
 )
@@ -379,6 +380,15 @@ func (s *Socket) acceptTCP() {
 		if err != nil {
 			return
 		}
+		remote, ok := c.RemoteAddr().(*net.TCPAddr)
+		if !ok {
+			_ = c.Close()
+			continue
+		}
+		c, err = tunsetup.ProtectUnderlayStream(c, remote.AddrPort().Addr())
+		if err != nil {
+			continue
+		}
 		select {
 		case s.accepting <- struct{}{}:
 			s.workers.Go(func() { defer func() { <-s.accepting }(); s.inboundTCP(c) })
@@ -416,8 +426,11 @@ func (s *Socket) dialTCP(ctx context.Context, a *attempt) {
 	for ctx.Err() == nil {
 		for _, addr := range a.tcpCandidates {
 			attemptCtx, cancel := context.WithTimeout(ctx, streamAttemptTimeout)
-			var dialer net.Dialer
+			dialer := net.Dialer{Control: tunsetup.UnderlayControl}
 			c, err := dialer.DialContext(attemptCtx, "tcp", addr.String())
+			if err == nil {
+				c, err = tunsetup.ProtectUnderlayStream(c, addr.Addr())
+			}
 			if err == nil {
 				err = s.outboundTCP(attemptCtx, a, c)
 			}

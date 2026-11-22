@@ -37,7 +37,7 @@ func (s *Socket) Observe(ctx context.Context, observer netip.AddrPort) (netip.Ad
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {
-		if _, err := conn.WriteToUDPAddrPort(query[:], observer); err != nil {
+		if _, err := s.writeTo(query[:], observer); err != nil {
 			select {
 			case <-s.done:
 				return netip.AddrPort{}, net.ErrClosed

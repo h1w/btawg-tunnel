@@ -122,7 +122,7 @@ func (n *meshNode) run(p2p, autoMap, allowPermanentUPnP bool, port uint16, endpo
 				}
 				refresh = time.Now().Add(8 * time.Second)
 			}
-			reg.Candidates = sockets.candidates(endpoint, tcpEndpoint, p.nativeIncoming, p.nativeOutgoing)
+			reg.Candidates = peerUnderlayCandidates(sockets.candidates(endpoint, tcpEndpoint, p.nativeIncoming, p.nativeOutgoing), netip.MustParseAddr(n.owner.cfg.ClientIP))
 		}
 		reply, err := n.register(reg)
 		if p2p && n.owner.shared != nil && err == nil {
@@ -370,7 +370,21 @@ func (t *directTun) Write(bufs [][]byte, offset int) (int, error) {
 		if p[0]>>4 != 4 || h < 20 || h > len(p) || netip.AddrFrom4([4]byte(p[12:16])) != t.peer || netip.AddrFrom4([4]byte(p[16:20])) != t.local {
 			continue
 		}
+		if windowsAssemblesIngress {
+			p = t.inboundPacket(p)
+			if p == nil {
+				continue
+			}
+			h = int(p[0]&15) * 4
+		}
 		if !t.shared.acceptPeerPacket(t.tunPath, p, h) {
+			continue
+		}
+		if windowsAssemblesIngress {
+			batch := [1][]byte{p}
+			if _, err := t.tunPath.Write(batch[:], 0); err != nil {
+				return 0, err
+			}
 			continue
 		}
 		if _, err := t.tunPath.Write([][]byte{b}, offset); err != nil {

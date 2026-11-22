@@ -23,6 +23,12 @@ import (
 )
 
 func main() {
+	if handled, err := platformCommand(os.Args[1:]); handled {
+		if err != nil {
+			fatal(err)
+		}
+		return
+	}
 	if len(os.Args) >= 2 {
 		switch os.Args[1] {
 		case "--version":
@@ -50,9 +56,9 @@ func fatal(err error) {
 	os.Exit(1)
 }
 
-// installMain persists the client configuration and installs the systemd
-// service. The import secret is read from a file or a hidden prompt and is
-// never placed in unit arguments.
+// installMain persists the client configuration and installs the service.
+// The import secret is read from a file or a hidden prompt, never passed in
+// service arguments.
 func installMain(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
 	importFile := fs.String("import-file", "", "file containing the btawg:// import string (secret)")
@@ -63,8 +69,8 @@ func installMain(args []string) error {
 		return err
 	}
 
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("install must run as root")
+	if !service.Privileged() {
+		return fmt.Errorf("install requires an elevated terminal")
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("use -import-file or the hidden terminal prompt")
@@ -86,7 +92,7 @@ func installMain(args []string) error {
 	if err := service.Client.Install(); err != nil {
 		return err
 	}
-	fmt.Println("btawg-client: installed and started; use sudo btawg-client to view SOCKS5 credentials")
+	fmt.Printf("btawg-client: installed and started; %s\n", installHelp())
 	return nil
 }
 
@@ -130,19 +136,6 @@ func runMain(args []string) error {
 		return fmt.Errorf("run: pass the btawg:// import string or -managed")
 	}
 	return runSingle(raw, *noTun, *tunName)
-}
-
-func runManaged(noTun bool, tunName string) error {
-	mc, err := client.LoadManagedConfig(client.ManagedConfigPath)
-	if err != nil {
-		return fmt.Errorf("load %s: %w", client.ManagedConfigPath, err)
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	if mc.TUNName != "" {
-		tunName = mc.TUNName
-	}
-	return client.RunManaged(ctx, mc, !noTun && !mc.NoTUN, tunName)
 }
 
 // legacyOrTUI runs a bare import string (single foreground connection) or the

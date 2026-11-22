@@ -15,13 +15,6 @@ import (
 	"bittorrent-tunnel/btawg/internal/service"
 )
 
-// ManagedConfigPath is the root-owned client configuration file.
-const ManagedConfigPath = "/etc/btawg/client.json"
-
-// ControlSocketPath is the root-only Unix socket the daemon serves for live
-// TUI control.
-const ControlSocketPath = "/run/btawg-client/control.sock"
-
 // HubRouteID names the server egress and is the default for unconfigured ports.
 const HubRouteID = mesh.HubRoute
 
@@ -242,7 +235,7 @@ func (c ManagedConfig) Save(path string) error {
 	if err != nil {
 		return err
 	}
-	return service.WriteFile(path, b, 0o600)
+	return service.WriteManagedFile(path, b)
 }
 
 // GenerateCredentials returns a fresh random SOCKS5 username/password pair.

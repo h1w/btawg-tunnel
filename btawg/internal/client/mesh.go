@@ -193,7 +193,9 @@ func (n *meshNode) dialDirectRoute(ctx context.Context, target netip.Addr) (net.
 		return nil, net.ErrClosed
 	}
 	var c Client
-	p.proxySockets(&c, netip.MustParseAddr(n.owner.cfg.ClientIP))
+	if err := p.proxySockets(&c, netip.MustParseAddr(n.owner.cfg.ClientIP)); err != nil {
+		return nil, err
+	}
 	conn, err := c.proxyTCP(ctx, netip.AddrPortFrom(target, mesh.EgressPort))
 	if err != nil {
 		return nil, err
@@ -320,7 +322,7 @@ func (n *meshNode) runExit(ctx context.Context, path *managedTunnel, running *at
 	if n.owner.shared == nil {
 		ln, err = path.c.ns.ListenTCPAddrPort(ap)
 	} else {
-		lc := net.ListenConfig{Control: tunsetup.BindDevice(n.owner.shared.name)}
+		lc := net.ListenConfig{Control: tunsetup.BindOwnedDevice(n.owner.shared.dev, n.owner.shared.name)}
 		ln, err = lc.Listen(ctx, "tcp4", ap.String())
 	}
 	if err != nil {

@@ -23,13 +23,14 @@ const (
 	pathBatchSize  = 16
 )
 
-// sharedTUN is the single kernel interface. Each transport gets a queue, not
-// a Linux device. SOCKS owns its source selectors while its kernel packets
-// drain; other traffic uses the lowest-index enabled transport.
+// sharedTUN is the single kernel interface. Each transport gets a queue.
+// Explicit proxy flows stay on their selected path; ordinary traffic uses
+// the lowest-index enabled transport unless a peer policy chooses another.
 type sharedTUN struct {
 	dev         tun.Device
 	name        string
 	mtu         int
+	closeRoute  func() error
 	primary     atomic.Pointer[tunPath]
 	servicePath atomic.Pointer[tunPath]
 	pool        sync.Pool
@@ -60,8 +61,10 @@ type localPort struct {
 }
 
 type socketPath struct {
-	path  *tunPath
-	until time.Time // nonzero only after the kernel socket is closed
+	path    *tunPath
+	until   time.Time // nonzero only while a closed socket drains
+	release func()
+	retired func() bool
 }
 
 type tunPath struct {
@@ -76,6 +79,8 @@ type tunPath struct {
 	events       chan tun.Event
 	mu           sync.Mutex // serialize close and enqueue
 	closed       bool
+	overlay      overlaySockets
+	fragments    overlayReassembly
 }
 
 func newSharedTUN(dev tun.Device, name string, mtu int) *sharedTUN {
@@ -105,6 +110,9 @@ func (s *sharedTUN) newPath() *tunPath {
 func (s *sharedTUN) close() error {
 	err := s.dev.Close()
 	s.workers.Wait()
+	if s.closeRoute != nil {
+		return errors.Join(err, s.closeRoute())
+	}
 	return err
 }
 
@@ -281,8 +289,24 @@ func (p *tunPath) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 }
 
 func (p *tunPath) Write(bufs [][]byte, offset int) (int, error) {
+	if windowsAssemblesIngress && p.directLife == nil {
+		for i, b := range bufs {
+			if len(b) < offset+20 {
+				continue
+			}
+			packet := p.inboundPacket(b[offset:])
+			if packet == nil || p.shared.peerEnabled.Load() && !p.shared.acceptHubPacket(p, packet) {
+				continue
+			}
+			batch := [1][]byte{packet}
+			if _, err := p.deliverPackets(batch[:], 0); err != nil {
+				return i, err
+			}
+		}
+		return len(bufs), nil
+	}
 	if p.directLife != nil || !p.shared.peerEnabled.Load() {
-		return p.shared.dev.Write(bufs, offset)
+		return p.deliverPackets(bufs, offset)
 	}
 	for i, b := range bufs {
 		if len(b) < offset+20 || !p.shared.acceptHubPacket(p, b[offset:]) {
@@ -296,34 +320,41 @@ func (p *tunPath) Write(bufs [][]byte, offset int) (int, error) {
 				}
 			}
 			if len(allowed) > 0 {
-				if _, err := p.shared.dev.Write(allowed, offset); err != nil {
+				if _, err := p.deliverPackets(allowed, offset); err != nil {
 					return 0, err
 				}
 			}
 			return len(bufs), nil
 		}
 	}
-	return p.shared.dev.Write(bufs, offset)
+	return p.deliverPackets(bufs, offset)
 }
 
 func (p *tunPath) Close() error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if !p.closed {
-		p.closed = true
-		close(p.done)
-		close(p.events)
-		for {
-			select {
-			case b := <-p.packets:
-				p.shared.pool.Put(b)
-			default:
-				return nil
-			}
+	if p.closed {
+		p.mu.Unlock()
+		return nil
+	}
+	p.closed = true
+	close(p.done)
+	close(p.events)
+	overlay := p.overlay
+	p.mu.Unlock()
+	if overlay != nil {
+		overlay.close()
+	}
+	for {
+		select {
+		case b := <-p.packets:
+			p.shared.pool.Put(b)
+		default:
+			return nil
 		}
 	}
-	return nil
 }
+
+type overlaySockets interface{ close() }
 
 func (p *tunPath) File() *os.File           { return nil }
 func (p *tunPath) MTU() (int, error)        { return p.shared.mtu, nil }

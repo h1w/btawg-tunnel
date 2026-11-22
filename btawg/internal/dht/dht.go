@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"bittorrent-tunnel/btawg/internal/tunsetup"
+
 	anadht "github.com/anacrolix/dht/v2"
 	"github.com/anacrolix/dht/v2/krpc"
 	"github.com/anacrolix/torrent/metainfo"
@@ -243,7 +245,7 @@ func Discover(ctx context.Context, infoHash [20]byte, bootstrap []string) ([]net
 	}
 	defer pc.Close()
 	srv, err := anadht.NewServer(&anadht.ServerConfig{
-		Conn:          pc,
+		Conn:          tunsetup.ProtectUnderlayPacket(pc),
 		NoSecurity:    true,
 		StartingNodes: bootstrapGetter(bootstrap),
 	})

@@ -5,7 +5,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   binaries:
@@ -28,11 +28,62 @@ jobs:
           test "$(dist/btawg-server --version)" = "$GITHUB_REF_NAME"
           test "$(dist/btawg-client --version)" = "$GITHUB_REF_NAME"
           sha256sum dist/btawg-server dist/btawg-client > dist/SHA256SUMS
-      - name: release
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binaries
+          path: btawg/dist/*
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: btawg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: btawg/go.mod
+      - run: ./scripts/package-windows.ps1 -Version $env:GITHUB_REF_NAME -OutDir dist
+      - run: ./scripts/test-windows.ps1 -Bundle dist/btawg-client-windows-amd64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-candidate
+          path: btawg/dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [binaries, windows]
+    runs-on: ubuntu-latest
+    environment: windows-client-parity
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-binaries
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-candidate
+          path: dist
+      - name: verify exact approved Windows bundle
+        working-directory: dist
+        env:
+          WINDOWS_10_VERIFIED_SHA256: ${{ secrets.WINDOWS_10_VERIFIED_SHA256 }}
+          WINDOWS_11_VERIFIED_SHA256: ${{ secrets.WINDOWS_11_VERIFIED_SHA256 }}
+        run: |
+          set -eu
+          actual=$(sha256sum btawg-client-windows-amd64.zip | cut -d' ' -f1)
+          test "$actual" = "$WINDOWS_10_VERIFIED_SHA256"
+          test "$actual" = "$WINDOWS_11_VERIFIED_SHA256"
+          sha256sum -c SHA256SUMS.windows
+          cat SHA256SUMS.windows >> SHA256SUMS
+      - uses: softprops/action-gh-release@v2
         with:
           files: |
-            btawg/dist/btawg-server
-            btawg/dist/btawg-client
-            btawg/dist/SHA256SUMS
+            dist/btawg-server
+            dist/btawg-client
+            dist/btawg-client-windows-amd64.zip
+            dist/SHA256SUMS
           generate_release_notes: true

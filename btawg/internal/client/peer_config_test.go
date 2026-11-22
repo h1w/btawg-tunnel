@@ -156,13 +156,13 @@ func TestDaemonPeerUpdatePersistsBeforeApplying(t *testing.T) {
 	cfg := ManagedConfig{Import: raw, ListenIP: "127.0.0.1", Credentials: Credentials{Username: "user", Password: "secret"}}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state", "client.json")
-	socket := filepath.Join(dir, "run", "control.sock")
+	socket := testControlEndpoint(t, filepath.Join(dir, "run", "control.sock"))
 	if err := cfg.Save(path); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- runManagedAt(ctx, cfg, path, socket, false, "btawg", 0) }()
+	go func() { done <- runManagedAt(ctx, cfg, path, socket, false, "btawg", 0, nil) }()
 	t.Cleanup(func() {
 		cancel()
 		if err := <-done; err != nil {

@@ -187,6 +187,10 @@ func (s *peerSockets) candidates(endpoint, tcpEndpoint string, incoming, outgoin
 	return result
 }
 
+func peerUnderlayCandidates(candidates []mesh.Candidate, vpnIP netip.Addr) []mesh.Candidate {
+	return slices.DeleteFunc(candidates, func(c mesh.Candidate) bool { return c.Addr.Addr().Unmap() == vpnIP })
+}
+
 func (s *peerSockets) nativeConnect(ctx context.Context, p mesh.Pair) (carrier.Transport, error) {
 	offer := nativepeer.Offer{Secret: p.Secret, Initiator: p.Initiator, Expires: p.Expires}
 	for _, c := range p.Candidates {

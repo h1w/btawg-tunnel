@@ -38,10 +38,10 @@ type Client struct {
 	ns   *netstack.Net // non-nil in netstack mode
 	ip   *tlsTunnel    // non-nil for TLS carrier modes
 
-	proxyTCP   func(ctx context.Context, addr netip.AddrPort) (net.Conn, error)
-	proxyUDP   func(ctx context.Context) (net.PacketConn, error)
-	proxyRoute *tunsetup.ProxyRoute
-	path       *tunPath
+	proxyTCP func(ctx context.Context, addr netip.AddrPort) (net.Conn, error)
+	proxyUDP func(ctx context.Context) (net.PacketConn, error)
+	closeTUN func() error
+	path     *tunPath
 
 	disc func(ctx context.Context) ([]netip.AddrPort, error)
 
@@ -72,41 +72,25 @@ func New(cfg config.ClientConfig) (*Client, error) {
 	return c, nil
 }
 
-// NewRealTUN builds a foreground client on its own kernel TUN (root).
+// NewRealTUN builds a foreground client on its own kernel TUN.
 func NewRealTUN(cfg config.ClientConfig, tunName string) (*Client, error) {
 	cfg.Transport = config.CanonicalMode(cfg.Transport)
 	c := &Client{cfg: cfg}
-	tunDev, err := openClientTUN(cfg, tunName)
+	dev, err := openClientTUN(cfg, tunName)
 	if err != nil {
 		return nil, err
 	}
-	route, err := tunsetup.NewProxyRoute(tunName)
+	path, err := c.configureForegroundTUN(dev, tunName)
 	if err != nil {
-		tunDev.Close()
-		return nil, fmt.Errorf("create SOCKS TUN route: %w", err)
-	}
-	c.proxyRoute = route
-	if err := c.start(tunDev); err != nil {
-		_ = route.Close()
+		_ = dev.Close()
 		return nil, err
 	}
-	clientIP := netip.MustParseAddr(cfg.ClientIP)
-	clientAddr := netip.AddrPortFrom(clientIP, 0)
-	dialer := net.Dialer{
-		LocalAddr: net.TCPAddrFromAddrPort(clientAddr),
-		Control: func(network, address string, socket syscall.RawConn) error {
-			if err := route.Control(network, address, socket); err != nil {
-				return err
-			}
-			return tunsetup.OverlayTCP(network, address, socket)
-		},
-	}
-	c.proxyTCP = func(ctx context.Context, addr netip.AddrPort) (net.Conn, error) {
-		return dialer.DialContext(ctx, "tcp4", addr.String())
-	}
-	listen := net.ListenConfig{Control: route.Control}
-	c.proxyUDP = func(ctx context.Context) (net.PacketConn, error) {
-		return listen.ListenPacket(ctx, "udp4", clientAddr.String())
+	if err := c.start(path); err != nil {
+		_ = path.Close()
+		if c.closeTUN != nil {
+			_ = c.closeTUN()
+		}
+		return nil, err
 	}
 	return c, nil
 }
@@ -151,7 +135,7 @@ func (c *Client) start(tunDev tun.Device) error {
 
 	mode := c.cfg.Transport
 	if config.IsNativeMode(mode) {
-		c.bind = conn.NewDefaultBind()
+		c.bind = newUnderlayBind()
 	} else {
 		c.bind = carrierbind.New()
 	}
@@ -427,10 +411,19 @@ func (c *Client) connectCarrier(ctx context.Context, addr netip.AddrPort) (carri
 		}
 		closeSocket = sock.Close
 	case config.ModeExtTCP, config.ModeReqTCP, config.ModeTLSExtTCP, config.ModeTLSReqTCP:
-		d := net.Dialer{Control: carrier.TCPControl}
+		d := net.Dialer{Control: func(network, address string, raw syscall.RawConn) error {
+			if err := tunsetup.UnderlayControl(network, address, raw); err != nil {
+				return err
+			}
+			return carrier.TCPControl(network, address, raw)
+		}}
 		conn, err = d.DialContext(ctx, "tcp", addr.String())
 		if err != nil {
 			return nil, nil, fmt.Errorf("carrier dial %s: %w", addr, err)
+		}
+		conn, err = tunsetup.ProtectUnderlayStream(conn, addr.Addr())
+		if err != nil {
+			return nil, nil, fmt.Errorf("carrier underlay: %w", err)
 		}
 	default:
 		return nil, nil, fmt.Errorf("unknown transport %q", c.cfg.Transport)
@@ -475,8 +468,8 @@ func (c *Client) connectCarrier(ctx context.Context, addr netip.AddrPort) (carri
 
 // Close tears the client down.
 func (c *Client) Close() {
-	if c.proxyRoute != nil {
-		_ = c.proxyRoute.Close()
+	if c.closeTUN != nil {
+		defer c.closeTUN()
 	}
 	if c.ip != nil {
 		c.ip.close()

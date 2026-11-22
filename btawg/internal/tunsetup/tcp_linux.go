@@ -7,6 +7,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// BindOwnedDevice preserves Linux device binding; Windows binds by adapter identity.
+func BindOwnedDevice(_ interface{}, name string) func(string, string, syscall.RawConn) error {
+	return BindDevice(name)
+}
+
 // OverlayTCP selects Reno only on the kernel TCP leg inside the carrier.
 // Bursty ACKs and transient carrier queues can make CUBIC HyStart exit slow
 // start far below the path's bandwidth-delay product. Bound the inner send

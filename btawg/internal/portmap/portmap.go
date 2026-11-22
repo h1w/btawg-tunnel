@@ -23,6 +23,7 @@ type router struct {
 	gateway            netip.Addr
 	source             netip.Addr
 	ifindex            int
+	luid               uint64
 	natPort            uint16
 	ssdp               netip.AddrPort
 	allowPermanentUPnP bool

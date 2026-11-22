@@ -28,7 +28,8 @@ func runTUI() error {
 			}
 			return nil, service.Client.Install()
 		},
-		Actions: clientActions,
+		Actions:              clientActions,
+		SetupRestartsService: setupRestartsService,
 	})
 }
 
@@ -68,12 +69,6 @@ func clientSetup(install bool) (*service.Screen, error) {
 			{Label: "Public P2P TCP address (optional)", Value: cfg.PeerTCPEndpoint},
 		},
 		Save: func(fields []service.Field) (*service.Screen, error) {
-			latest, err := client.LoadManagedConfig(client.ManagedConfigPath)
-			if err == nil {
-				previous = &latest
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return nil, err
-			}
 			port, err := parsePeerPort(fields[8].Value)
 			if err != nil {
 				return nil, err
@@ -84,7 +79,17 @@ func clientSetup(install bool) (*service.Screen, error) {
 				PeerPort: port, PeerEndpoint: fields[9].Value,
 				PeerTCPEndpoint: fields[10].Value,
 			}
-			if err := saveClientSettings(previous, fields[0].Value, settings); err != nil {
+			if err := persistClientSettings(func() error {
+				latest, err := client.LoadManagedConfig(client.ManagedConfigPath)
+				if err == nil {
+					previous = &latest
+				} else if !errors.Is(err, os.ErrNotExist) {
+					return err
+				} else {
+					previous = nil
+				}
+				return saveClientSettings(previous, fields[0].Value, settings)
+			}); err != nil {
 				return nil, err
 			}
 			if install {

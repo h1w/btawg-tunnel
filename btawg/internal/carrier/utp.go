@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 
+	"bittorrent-tunnel/btawg/internal/tunsetup"
+
 	"github.com/anacrolix/go-utp/purego"
 )
 
@@ -32,6 +34,6 @@ func NewUTPSocket(conn *net.UDPConn) (*purego.Socket, error) {
 	// At 200 ms RTT, 500 Mbit/s of application data needs about 19 MB
 	// in flight when request/piece transmits 2 KiB frames for 1.35 KiB payloads.
 	const flightWindow = 24 << 20
-	return purego.NewSocketFromPacketConn(conn,
+	return purego.NewSocketFromPacketConn(tunsetup.ProtectUnderlayPacket(conn),
 		purego.WithBufferSizes(flightWindow, flightWindow), purego.WithPacingRate(bytesPerSecond))
 }

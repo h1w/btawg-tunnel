@@ -10,15 +10,11 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 )
 
 func defaultRouter(ctx context.Context) (router, error) {
-	if runtime.GOOS != "linux" {
-		return router{}, errors.New("automatic IPv4 port mapping requires Linux route discovery")
-	}
 	f, err := os.Open("/proc/net/route")
 	if err != nil {
 		return router{}, fmt.Errorf("read Linux IPv4 routes: %w", err)

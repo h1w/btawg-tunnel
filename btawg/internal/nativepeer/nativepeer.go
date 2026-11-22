@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"bittorrent-tunnel/btawg/internal/carrier"
+	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
 const (
@@ -34,6 +35,8 @@ type Offer struct {
 
 type Socket struct {
 	v4, v6    *net.UDPConn
+	underlay4 net.PacketConn
+	underlay6 net.PacketConn
 	port      uint16
 	mu        sync.Mutex
 	closed    bool
@@ -82,7 +85,11 @@ func Listen(port uint16) (*Socket, error) {
 		return nil, fmt.Errorf("listen native UDP4: %w", err)
 	}
 	s := &Socket{v4: v4, port: v4.LocalAddr().(*net.UDPAddr).AddrPort().Port(), attempts: make(map[token]*attempt), paths: make(map[netip.AddrPort]*transport), observers: make(map[token]observation), done: make(chan struct{})}
+	s.underlay4 = tunsetup.ProtectUnderlayPacket(v4)
 	s.v6, _ = net.ListenUDP("udp6", &net.UDPAddr{Port: int(s.port)})
+	if s.v6 != nil {
+		s.underlay6 = tunsetup.ProtectUnderlayPacket(s.v6)
+	}
 	for _, conn := range []*net.UDPConn{s.v4, s.v6} {
 		if conn != nil {
 			s.workers.Add(1)
@@ -101,6 +108,12 @@ func (s *Socket) family(ip netip.Addr) *net.UDPConn {
 	}
 	return nil
 }
+func (s *Socket) writeTo(b []byte, addr netip.AddrPort) (int, error) {
+	if addr.Addr().Unmap().Is4() {
+		return s.underlay4.WriteTo(b, net.UDPAddrFromAddrPort(addr))
+	}
+	return s.underlay6.WriteTo(b, net.UDPAddrFromAddrPort(addr))
+}
 func normalized(a netip.AddrPort) netip.AddrPort {
 	return netip.AddrPortFrom(a.Addr().Unmap(), a.Port())
 }
@@ -116,7 +129,7 @@ func (s *Socket) LocalCandidates() []netip.AddrPort {
 	var result []netip.AddrPort
 	seen := make(map[netip.Addr]bool)
 	for _, iface := range interfaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0 {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0 || !tunsetup.IsUnderlayInterface(iface.Index) {
 			continue
 		}
 		addrs, err := iface.Addrs()
@@ -283,7 +296,7 @@ func (s *Socket) sendControl(key [32]byte, id, local, peer token, flags byte, ad
 	copy(b[41:57], peer[:])
 	tag := digest(key, "btawg/nativepeer/punch/1", b[8:57])
 	copy(b[57:], tag[:])
-	_, _ = s.family(addr.Addr()).WriteToUDPAddrPort(b[:], addr)
+	_, _ = s.writeTo(b[:], addr)
 }
 func (s *Socket) read(conn *net.UDPConn) {
 	defer s.workers.Done()
@@ -410,7 +423,7 @@ func (t *transport) Send(b []byte) error {
 		return net.ErrClosed
 	default:
 	}
-	_, err := t.s.family(t.addr.Addr()).WriteToUDPAddrPort(b, t.addr)
+	_, err := t.s.writeTo(b, t.addr)
 	return err
 }
 func (t *transport) Recv() <-chan []byte   { return t.recv }

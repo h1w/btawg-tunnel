@@ -15,6 +15,11 @@ func RequestControl(req ControlRequest) (r ControlResponse, running bool, err er
 		return r, true, err
 	}
 	if req.mutates() {
+		unlock, err := lockOfflineConfig()
+		if err != nil {
+			return r, false, err
+		}
+		defer unlock()
 		state, _, err := service.Client.State()
 		if err != nil {
 			return r, false, err

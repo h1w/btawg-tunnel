@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"bittorrent-tunnel/btawg/internal/carrier"
+	"bittorrent-tunnel/btawg/internal/tunsetup"
 
 	"github.com/anacrolix/go-utp/purego"
 )
@@ -130,7 +131,7 @@ func (s *Socket) LocalCandidates() []Candidate {
 	var result []Candidate
 	seen := make(map[netip.Addr]bool)
 	for _, intf := range interfaces {
-		if intf.Flags&net.FlagUp == 0 || intf.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0 {
+		if intf.Flags&net.FlagUp == 0 || intf.Flags&(net.FlagLoopback|net.FlagPointToPoint) != 0 || !tunsetup.IsUnderlayInterface(intf.Index) {
 			continue
 		}
 		addrs, err := intf.Addrs()

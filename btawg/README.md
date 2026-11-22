@@ -165,6 +165,42 @@ sudo ./btawg-client 'btawg://…'      # one mode, btawg0 interface
 ./btawg-client -no-tun 'btawg://…'   # no interface, SOCKS5-only mode
 ```
 
+### Windows x64 client
+
+Extract `btawg-client-windows-amd64.zip` with `btawg-client.exe`, `wintun.dll`,
+and `Wintun-LICENSE.txt` together. From an elevated Windows Terminal, run
+`./btawg-client.exe` and use **Install service** with the same `btawg://` import
+as on Linux. For unattended setup, run `./btawg-client.exe install -import-file
+client.txt`. The native Windows service starts at boot and works without the
+terminal. **Remove service** leaves your configuration and installed bundle.
+
+The Wintun interface uses the imported IPv4 address and routes, not a default
+route. A conflicting LAN or VPN prefix is an error; fix the overlap before
+starting the real-TUN client. The TUI, SOCKS5 ports, balance pools and peer
+menus are shared with Linux. **View service logs** shows the Windows Application
+event log entries for `btawg-client`.
+
+The client does not change Windows Firewall. For direct connections allow
+the configured P2P TCP and UDP listeners on the network where peers can reach
+them, and the separate native AWG/WG peer UDP sockets when using those modes.
+On the TUN, allow only the btawg peer probe (TCP 1057), assigned egress listener
+(TCP 1055 when enabled) and any services you intend to expose by VPN IP, scoped
+to the applicable VPN addresses. Leave unrelated inbound traffic blocked.
+
+For release verification, run `scripts/test-windows.ps1 -Bundle <zip>` in an
+elevated test VM, then use `scripts/windows-parity.ps1 -Bundle <zip> -Fixture
+<json> -ExpectedSha256 <digest>` on Windows 10 22H2 and Windows 11 with a Linux
+hub and peer. The fixture JSON supplies `ImportFile`, `VPNIP`, `EchoURL`,
+`EchoBody`, `PeerEchoURL`, and `ObservationFile`. The observation JSON records
+`sha256`, `platform` (`windows-10-22h2` or `windows-11`), and a `scenarios` map
+with a `passed` boolean and a link or path to evidence for each required case
+listed by the harness. Do not include imports or credentials in the evidence.
+Protect the `windows-client-parity` GitHub environment with required reviewers.
+Set its `WINDOWS_10_VERIFIED_SHA256` and `WINDOWS_11_VERIFIED_SHA256` secrets only
+after the respective passing runs for the tagged ZIP. The release refuses
+missing or different digests and publishes the tested ZIP unchanged.
+
+
 ### Update an installed service
 
 In either dashboard (`sudo btawg-server` or `sudo btawg-client`), choose
@@ -172,9 +208,10 @@ In either dashboard (`sudo btawg-server` or `sudo btawg-client`), choose
 connection, without SOCKS5 or proxy environment variables. It checks the
 latest stable release in [GitHub Releases](https://github.com/h1w/btawg-tunnel/releases/latest)
 and installs only a newer version after verifying its SHA-256. It keeps
-settings, keys, and the systemd unit unchanged. A running service is restarted;
-a stopped service stays stopped. If the new service fails to start, the
-updater restores the previous executable and tries to restart it.
+settings, keys, and the service's autostart setting. A running service is
+restarted; a stopped service stays stopped. On Windows the service selects a
+complete EXE/DLL bundle at a time. If the new service fails to start, the
+updater restores the previous executable or bundle and tries to restart it.
 
 Both dashboards show the current update stage at the bottom of the screen.
 During the download they show the percentage, or the amount downloaded if

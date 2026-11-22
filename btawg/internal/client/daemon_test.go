@@ -22,13 +22,13 @@ func TestDaemonControlToggleRotatePersist(t *testing.T) {
 	cfg.Routes = map[int]string{1080: "unavailable-route"}
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "state", "client.json")
-	socket := filepath.Join(dir, "run", "ctl.sock")
+	socket := testControlEndpoint(t, filepath.Join(dir, "run", "ctl.sock"))
 	if err := cfg.Save(cfgPath); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- runManagedAt(ctx, cfg, cfgPath, socket, false, "btawg", 0) }()
+	go func() { done <- runManagedAt(ctx, cfg, cfgPath, socket, false, "btawg", 0, nil) }()
 	t.Cleanup(func() {
 		cancel()
 		if err := <-done; err != nil {

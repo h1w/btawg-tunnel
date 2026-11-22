@@ -36,7 +36,7 @@ func (r router) udpRequest(parent context.Context, request []byte, retransmit bo
 	ctx, cancel := context.WithTimeout(parent, probeTimeout)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	dialer := net.Dialer{LocalAddr: net.UDPAddrFromAddrPort(netip.AddrPortFrom(r.source, 0))}
+	dialer := net.Dialer{LocalAddr: net.UDPAddrFromAddrPort(netip.AddrPortFrom(r.source, 0)), Control: r.socketControl}
 	conn, err := dialer.DialContext(ctx, "udp4", netip.AddrPortFrom(r.gateway, r.natPort).String())
 	if err != nil {
 		return err
@@ -53,6 +53,9 @@ func (r router) udpRequest(parent context.Context, request []byte, retransmit bo
 	interval := 250 * time.Millisecond
 	for {
 		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := r.validateSnapshot(); err != nil {
 			return err
 		}
 		if _, err := conn.Write(request); err != nil {

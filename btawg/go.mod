@@ -5,6 +5,7 @@ go 1.27.4
 replace github.com/anacrolix/go-utp => ./third_party/go-utp
 
 require (
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20261116
 	github.com/anacrolix/dht/v2 v2.24.0
 	github.com/anacrolix/go-utp v0.0.0-00010101000000-000000000000

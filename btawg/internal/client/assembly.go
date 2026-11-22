@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net/netip"
@@ -13,7 +12,6 @@ import (
 
 	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/socks"
-	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
 type managedTunnel struct {
@@ -34,7 +32,6 @@ type Managed struct {
 	inbound   *managed
 	cfg       config.ClientConfig
 	shared    *sharedTUN
-	route     *tunsetup.ProxyRoute
 	mu        sync.Mutex
 	tunnels   []*managedTunnel
 	fixed     []string
@@ -70,18 +67,12 @@ func newManagedWithPeer(ctx context.Context, cfg config.ClientConfig, enabled []
 		m.balance[i].policy = policy
 	}
 	if realTUN {
-		dev, err := openClientTUN(cfg, tunBase)
+		shared, err := openSharedClientTUN(cfg, tunBase)
 		if err != nil {
 			inbound.Close()
 			return nil, err
 		}
-		m.route, err = tunsetup.NewProxyRoute(tunBase)
-		if err != nil {
-			dev.Close()
-			inbound.Close()
-			return nil, err
-		}
-		m.shared = newSharedTUN(dev, tunBase, config.DefaultMTU)
+		m.shared = shared
 	}
 	m.applyPeerSettings(peer)
 	if m.shared != nil && p2p {
@@ -166,8 +157,11 @@ func (m *Managed) applyLocked(enabled []string, auth Credentials, pools map[stri
 		if m.shared != nil {
 			path := m.shared.newPath()
 			c = &Client{cfg: cfg, path: path}
-			path.proxySockets(c, netip.MustParseAddr(cfg.ClientIP))
-			err = c.start(path)
+			if err = path.proxySockets(c, netip.MustParseAddr(cfg.ClientIP)); err == nil {
+				err = c.start(path)
+			} else {
+				_ = path.Close()
+			}
 		} else {
 			c, err = New(cfg)
 		}
@@ -312,7 +306,7 @@ func (m *Managed) Close() error {
 		}
 	}
 	if m.shared != nil {
-		return errors.Join(m.route.Close(), m.shared.close())
+		return m.shared.close()
 	}
 	return nil
 }
