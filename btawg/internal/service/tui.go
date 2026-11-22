@@ -62,7 +62,9 @@ func TUI(menu Menu) error {
 		notices = make(chan string, 1)
 		d.releaseNotices = notices
 	}
-	app, err := tui.NewApp(tui.WithRootComponent(d), tui.WithMouse())
+	app, err := tui.NewApp(tui.WithRootComponent(d), tui.WithMouse(), tui.WithOnResume(func() {
+		d.mouseReleased = false // go-tui re-enables reporting when it resumes.
+	}))
 	if err != nil {
 		return err
 	}
@@ -122,14 +124,15 @@ type dashboard struct {
 	quitAfterUpdate bool
 	updateProgress  atomic.Value // string; published by the update worker
 
-	screen    *Screen
-	history   []*Screen
-	confirm   *Action
-	message   string
-	selection int
-	offset    int
-	hits      []hit
-	textInput bool
+	screen        *Screen
+	history       []*Screen
+	confirm       *Action
+	message       string
+	selection     int
+	offset        int
+	hits          []hit
+	selectText    bool // keep mouse capture off across screens
+	mouseReleased bool // the terminal currently handles the mouse
 }
 
 type hit struct {
@@ -324,14 +327,14 @@ func (d *dashboard) settings() (*Screen, error) {
 
 func (d *dashboard) syncInputMode(term tui.Terminal) {
 	s := d.screen
-	textInput := s != nil && s.Save != nil && d.selection < len(s.Fields) && !s.Fields[d.selection].Toggle
-	if textInput == d.textInput {
+	releaseMouse := d.selectText || s != nil && len(s.Choices) == 0 &&
+		(s.Save == nil || d.selection < len(s.Fields) && !s.Fields[d.selection].Toggle)
+	if releaseMouse == d.mouseReleased {
 		return
 	}
-	d.textInput = textInput
-	// Let the SSH terminal handle right-click paste instead of reporting it
-	// to the application while a text field is selected.
-	if textInput {
+	d.mouseReleased = releaseMouse
+	// Let the terminal select/copy documents and paste into focused text fields.
+	if releaseMouse {
 		term.DisableMouse()
 	} else {
 		term.EnableMouse()
@@ -492,6 +495,11 @@ func (d *dashboard) key(e tui.KeyEvent) {
 		}
 		return
 	}
+	if e.Key == tui.KeyRune && e.Rune == 't' && e.Mod == tui.ModCtrl {
+		d.selectText = !d.selectText
+		d.app.MarkDirty()
+		return
+	}
 	if d.busy && d.working != "" && d.working != updateActionLabel {
 		return
 	}
@@ -596,6 +604,14 @@ func (d *dashboard) Render(app *tui.App) *tui.Element {
 	status := "Service: " + state
 	if d.current.state != "" && state != NotInstalled {
 		status += "   |   Autostart: " + checkbox(d.current.enabled)
+	}
+	switch {
+	case !d.mouseReleased:
+		status += "   |   Ctrl+T: select text"
+	case d.selectText:
+		status += "   |   Ctrl+T: menu mouse"
+	default:
+		status += "   |   Use terminal to select / paste"
 	}
 	style := muted
 	if state == "active" {

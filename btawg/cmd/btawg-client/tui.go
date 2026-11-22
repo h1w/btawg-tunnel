@@ -349,5 +349,5 @@ func socksCredentials(op string) (*service.Screen, error) {
 	if op == "rotate" {
 		title = "New SOCKS5 credentials"
 	}
-	return &service.Screen{Title: title, Text: fmt.Sprintf("Username: %s\nPassword: %s", r.Credentials.Username, r.Credentials.Password)}, nil
+	return &service.Screen{Title: title, Text: fmt.Sprintf("Username:\n%s\nPassword:\n%s", r.Credentials.Username, r.Credentials.Password)}, nil
 }

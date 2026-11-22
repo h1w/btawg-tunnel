@@ -90,6 +90,44 @@ func TestTextFieldLeavesPasteMouseGestureToTerminal(t *testing.T) {
 	}
 }
 
+func TestDocumentLeavesTextSelectionToTerminal(t *testing.T) {
+	term := tui.NewMockTerminal(80, 24)
+	term.EnableMouse()
+	d := dashboard{app: new(tui.App)}
+	d.open(&Screen{Text: "Username: operator\nPassword: test-only", Dismiss: func() error { return nil }})
+	d.syncInputMode(term)
+	if term.IsMouseEnabled() {
+		t.Fatal("mouse reporting prevents selecting the displayed credentials")
+	}
+	d.key(tui.KeyEvent{Key: tui.KeyEscape})
+	d.syncInputMode(term)
+	if !term.IsMouseEnabled() {
+		t.Fatal("returning from the document did not restore menu clicks")
+	}
+}
+
+func TestSelectionShortcutKeepsTerminalInControlUntilToggledOff(t *testing.T) {
+	term := tui.NewMockTerminal(80, 24)
+	term.EnableMouse()
+	d := dashboard{app: new(tui.App)}
+	shortcut := tui.KeyEvent{Key: tui.KeyRune, Rune: 't', Mod: tui.ModCtrl}
+	d.key(shortcut)
+	d.syncInputMode(term)
+	if term.IsMouseEnabled() {
+		t.Fatal("Ctrl+T did not release mouse capture")
+	}
+	d.open(&Screen{Choices: []Action{{Label: "Next"}}})
+	d.syncInputMode(term)
+	if term.IsMouseEnabled() {
+		t.Fatal("opening another menu recaptured the mouse")
+	}
+	d.key(shortcut)
+	d.syncInputMode(term)
+	if !term.IsMouseEnabled() {
+		t.Fatal("second Ctrl+T did not restore menu clicks")
+	}
+}
+
 func TestGitHubUpdateKeepsDashboardNavigationResponsive(t *testing.T) {
 	d := dashboard{
 		app: new(tui.App), menu: Menu{Unit: Client}, root: true,

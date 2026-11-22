@@ -37,6 +37,24 @@ writes and enables `btawg-server.service`, and starts it. Save the initial
 leave it available under **Web panel and initial login**. Do not delete the
 database to recover a password: it contains the hub and client identities.
 
+To copy a login or password, select its value on the **Web panel and initial
+login** screen or the client's **Show SOCKS5 credentials** screen. Each value
+is on its own line, and these screens leave the mouse to the terminal. On
+other screens, **Ctrl+T** switches between terminal selection and menu
+clicks. Use ↑/↓ or PgUp/PgDn to scroll a document before selecting text.
+
+- **Local terminal or SSH:** drag to select, then use the local terminal's
+  Copy action (often **Ctrl+Shift+C**). In PuTTY on Windows, dragging and
+  releasing copies the selection by default. Plain **Ctrl+C** exits the TUI.
+- **tmux:** press the tmux prefix (default **Ctrl+B**), then **[**. Move to
+  the text with the arrows. Start the selection with **Ctrl+Space** and copy
+  with **Alt+W** in emacs mode, or use **Space** and **Enter** in vi mode.
+  Prefix then **]** pastes from the tmux buffer. Copying to your workstation's
+  clipboard instead requires support from your terminal and tmux configuration.
+- **Linux virtual console (`/dev/ttyN`):** use tmux copy mode, or select and
+  paste with the console mouse service (GPM) if configured. A bare console has
+  no desktop clipboard.
+
 After installation, `sudo btawg-server` opens the dashboard. Use ↑/↓ and Enter
 or click a menu item. Start, stop, restart, autostart, logs, update, and removal
 are available in the dashboard. Open **Service settings** to change launch

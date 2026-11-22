@@ -57,20 +57,20 @@ func panelScreen() (*service.Screen, error) {
 	pending, err := os.ReadFile(path)
 	s := &service.Screen{
 		Title: "Web panel",
-		Text: "Default local URL: http://127.0.0.1:8080\n" +
-			"VPN URL: the Default group gateway (default http://10.77.0.1:8080).\n" +
-			"Before the VPN is connected: ssh -N -L 8080:127.0.0.1:8080 USER@VPS\n\n" +
-			"Username: admin",
+		Text:  "Username:\nadmin",
 	}
+	const access = "\n\nDefault local URL: http://127.0.0.1:8080\n" +
+		"VPN URL: the Default group gateway (default http://10.77.0.1:8080).\n" +
+		"Before the VPN is connected: ssh -N -L 8080:127.0.0.1:8080 USER@VPS"
 	if errors.Is(err, os.ErrNotExist) {
-		s.Text += "\nUse the password saved at installation."
+		s.Text += "\nUse the password saved at installation." + access
 		return s, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	s.Title = "Initial web panel login"
-	s.Text += fmt.Sprintf("\nPassword: %s\n\nSave this password now. Enter acknowledges it; Esc keeps it for later.", pending)
+	s.Text += fmt.Sprintf("\nPassword:\n%s\n\nSave this password now. Enter acknowledges it; Esc keeps it for later.", pending) + access
 	s.Dismiss = func() error {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
