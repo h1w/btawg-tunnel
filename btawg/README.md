@@ -243,9 +243,10 @@ Either free the port or choose a free block of 13 ports in **Service settings**
 The client does not change Windows Firewall. For direct connections allow
 the configured P2P TCP and UDP listeners on the network where peers can reach
 them, and the separate native AWG/WG peer UDP sockets when using those modes.
-On the TUN, allow only the btawg peer probe (TCP 1057), assigned egress listener
-(TCP 1055 when enabled) and any services you intend to expose by VPN IP, scoped
-to the applicable VPN addresses. Leave unrelated inbound traffic blocked.
+The internal P2P health check (TCP 1057) is answered inside the authenticated
+direct tunnel and needs no Windows Firewall rule. On the TUN, allow the egress
+listener (TCP 1055 when enabled) and any services you intend to expose by VPN
+IP, scoped to the applicable VPN addresses. Leave unrelated inbound traffic blocked.
 
 Both Windows release ZIPs run native component tests in GitHub Actions. For
 manual verification, run `scripts/test-windows.ps1 -Bundle <zip>` in an

@@ -19,22 +19,26 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/transport/tcp"
 	"gvisor.dev/gvisor/pkg/tcpip/transport/udp"
 	"gvisor.dev/gvisor/pkg/waiter"
+
+	"bittorrent-tunnel/btawg/internal/mesh"
 )
 
 // The Windows host has no per-interface policy route equivalent to Linux's
 // SOCKS route. Give explicit overlay sockets their own IPv4 stack per path.
 // The Windows kernel still reserves their source ports on the real adapter.
 type windowsOverlay struct {
-	path   *tunPath
-	local  netip.Addr
-	stack  *stack.Stack
-	link   *channel.Endpoint
-	worker chan struct{}
-	cancel context.CancelFunc
-	life   context.Context
-	dials  sync.WaitGroup
-	mu     sync.RWMutex
-	closed bool
+	path      *tunPath
+	local     netip.Addr
+	stack     *stack.Stack
+	link      *channel.Endpoint
+	worker    chan struct{}
+	cancel    context.CancelFunc
+	life      context.Context
+	dials     sync.WaitGroup
+	mu        sync.RWMutex
+	closed    bool
+	probe     net.Listener
+	probeDone chan struct{}
 }
 
 // The default gVisor qdisc ignores a short link write. Report a full link
@@ -84,6 +88,18 @@ func newWindowsOverlay(path *tunPath, local netip.Addr) (*windowsOverlay, error)
 	s.SetRouteTable([]tcpip.Route{{Destination: header.IPv4EmptySubnet, NIC: 1}})
 	life, cancel := context.WithCancel(context.Background())
 	o := &windowsOverlay{path: path, local: local, stack: s, link: link, worker: make(chan struct{}), life: life, cancel: cancel}
+	if path.directLife != nil && !path.peerOutbound {
+		probeAddr := tcpip.FullAddress{NIC: 1, Addr: tcpip.AddrFrom4(local.As4()), Port: mesh.PeerProbePort}
+		ln, err := gonet.ListenTCP(s, probeAddr, ipv4.ProtocolNumber)
+		if err != nil {
+			cancel()
+			s.Destroy()
+			link.Close()
+			return nil, fmt.Errorf("listen for direct peer probes: %w", err)
+		}
+		o.probe, o.probeDone = ln, make(chan struct{})
+		go func() { defer close(o.probeDone); acceptPeerProbes(ln) }()
+	}
 	go o.forward()
 	return o, nil
 }
@@ -122,6 +138,10 @@ func (o *windowsOverlay) close() {
 	o.closed = true
 	o.cancel()
 	o.mu.Unlock()
+	if o.probe != nil {
+		o.probe.Close()
+		<-o.probeDone
+	}
 	o.dials.Wait()
 	o.stack.Destroy()
 	o.link.Close()

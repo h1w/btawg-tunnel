@@ -12,9 +12,6 @@ import (
 )
 
 func (n *meshNode) servePeerProbe() {
-	if n.owner.shared == nil {
-		return
-	}
 	ip := netip.MustParseAddr(n.owner.cfg.ClientIP)
 	lc := net.ListenConfig{Control: tunsetup.BindOwnedDevice(n.owner.shared.dev, n.owner.shared.name)}
 	ln, err := lc.Listen(n.ctx, "tcp4", netip.AddrPortFrom(ip, mesh.PeerProbePort).String())
@@ -27,6 +24,10 @@ func (n *meshNode) servePeerProbe() {
 	defer ln.Close()
 	stop := context.AfterFunc(n.ctx, func() { ln.Close() })
 	defer stop()
+	acceptPeerProbes(ln)
+}
+
+func acceptPeerProbes(ln net.Listener) {
 	for {
 		c, err := ln.Accept()
 		if err != nil {

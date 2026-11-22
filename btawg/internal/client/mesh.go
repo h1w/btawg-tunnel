@@ -409,7 +409,7 @@ func (n *meshNode) start(p2p, autoMap, allowPermanentUPnP, serve bool, port uint
 		if serve {
 			n.owner.networkWG.Go(func() { n.serveExit(&exitRunning) })
 		}
-		if p2p && n.owner.shared != nil {
+		if p2p && n.owner.shared != nil && kernelPeerProbe {
 			n.owner.networkWG.Go(n.servePeerProbe)
 		}
 		n.run(p2p, autoMap, allowPermanentUPnP, port, endpoint, tcpEndpoint, &exitRunning)

@@ -9,7 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
+
+	"bittorrent-tunnel/btawg/internal/config"
+	"bittorrent-tunnel/btawg/internal/mesh"
 )
 
 func TestWindowsOverlayPortExcludesKernelWildcard(t *testing.T) {
@@ -95,5 +99,56 @@ func TestWindowsOverlayUDPReplySurvivesHubPathChange(t *testing.T) {
 		if err != nil || !bytes.Equal(got[:n], payload) || from.String() != remote.String() {
 			t.Fatalf("reply to owned overlay socket = %x from %v, %v", got[:n], from, err)
 		}
+	}
+}
+
+type probeTestTUN struct {
+	tun.Device
+	writes int
+}
+
+func (d *probeTestTUN) Write(bufs [][]byte, _ int) (int, error) {
+	d.writes += len(bufs)
+	return len(bufs), nil
+}
+
+func TestWindowsDirectProbeNeverNeedsWintun(t *testing.T) {
+	cfg := config.ClientConfig{ClientIP: "10.77.0.2", ServerIP: "10.77.0.1", Subnet: "10.77.0.0/24"}
+	local, peer := netip.MustParseAddr(cfg.ClientIP), netip.MustParseAddr("10.77.0.3")
+	dev := &probeTestTUN{}
+	s := &sharedTUN{dev: dev, mtu: 1280, done: make(chan struct{})}
+	s.pool.New = func() any { return newPacketBuffer(s.mtu) }
+	s.enableDirect(cfg)
+	s.applyPeerPolicies(compilePeerPolicies(PeerSettings{Incoming: []string{config.ModeExtUTP}}))
+	p := s.newPath()
+	fixture := directFlowPath(t, config.ModeExtUTP, false)
+	p.directLife, p.directUntil, p.peerMode = fixture.directLife, fixture.directUntil, fixture.peerMode
+	t.Cleanup(func() { p.Close() })
+	link := &directTun{tunPath: p, local: local, peer: peer}
+	probe := peerTCP(peer, local, 19600, mesh.PeerProbePort, 0x02)
+	probe[8] = 64
+	binary.BigEndian.PutUint16(probe[10:12], ^header.IPv4(probe).CalculateChecksum())
+	peerIP, localIP := header.IPv4(probe).SourceAddress(), header.IPv4(probe).DestinationAddress()
+	binary.BigEndian.PutUint16(probe[36:38], ^header.TCP(probe[20:]).CalculateChecksum(header.PseudoHeaderChecksum(header.TCPProtocolNumber, peerIP, localIP, 20)))
+	if _, err := link.Write([][]byte{probe}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if dev.writes != 0 {
+		t.Fatal("authenticated probe was sent to Windows Firewall through Wintun")
+	}
+	select {
+	case buf := <-p.packets:
+		reply := (*buf)[packetHeadroom:]
+		defer s.pool.Put(buf)
+		ip := header.IPv4(reply)
+		tcp := header.TCP(reply[ip.HeaderLength():])
+		if ip.SourceAddress() != localIP || ip.DestinationAddress() != peerIP || tcp.SourcePort() != mesh.PeerProbePort || tcp.DestinationPort() != 19600 || tcp.Flags() != header.TCPFlagSyn|header.TCPFlagAck {
+			t.Fatalf("invalid direct probe reply: %x", reply)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("probe did not receive a SYN-ACK on its authenticated path")
+	}
+	if _, err := link.Write([][]byte{peerTCP(peer, local, 19601, 19722, 0x02)}, 0); err != nil || dev.writes != 1 {
+		t.Fatalf("ordinary traffic did not reach Wintun: writes=%d err=%v", dev.writes, err)
 	}
 }

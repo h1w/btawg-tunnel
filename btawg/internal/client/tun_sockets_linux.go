@@ -14,6 +14,7 @@ import (
 )
 
 const windowsAssemblesIngress = false
+const kernelPeerProbe = true
 
 func (p *tunPath) inboundPacket(packet []byte) []byte { return packet }
 

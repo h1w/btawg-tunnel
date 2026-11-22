@@ -1,32 +1,44 @@
 package client
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"net/netip"
 	"time"
+
+	"bittorrent-tunnel/btawg/internal/mesh"
 )
 
 const windowsAssemblesIngress = true
+const kernelPeerProbe = false
 
 func (p *tunPath) inboundPacket(packet []byte) []byte {
 	return p.fragments.push(packet, time.Now())
 }
 
-func (p *tunPath) proxySockets(c *Client, source netip.Addr) error {
+func (p *tunPath) windowsOverlay(source netip.Addr) (*windowsOverlay, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.closed {
-		return net.ErrClosed
+		return nil, net.ErrClosed
 	}
 	o, _ := p.overlay.(*windowsOverlay)
 	if o == nil {
 		var err error
 		o, err = newWindowsOverlay(p, source)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		p.overlay = o
+	}
+	return o, nil
+}
+
+func (p *tunPath) proxySockets(c *Client, source netip.Addr) error {
+	o, err := p.windowsOverlay(source)
+	if err != nil {
+		return err
 	}
 	c.proxyTCP, c.proxyUDP = o.tcp, o.udp
 	return nil
@@ -34,7 +46,20 @@ func (p *tunPath) proxySockets(c *Client, source netip.Addr) error {
 
 func (p *tunPath) deliverPackets(bufs [][]byte, offset int) (int, error) {
 	for i, b := range bufs {
-		if len(b) < offset || p.deliverOverlay(b[offset:]) {
+		if len(b) < offset {
+			continue
+		}
+		packet := b[offset:]
+		if p.directLife != nil && !p.peerOutbound && isPeerProbe(packet) {
+			// directTun already authenticated the packet and checked incoming policy.
+			o, err := p.windowsOverlay(netip.AddrFrom4([4]byte(packet[16:20])))
+			if err != nil {
+				return i, err
+			}
+			o.deliver(packet)
+			continue
+		}
+		if p.deliverOverlay(packet) {
 			continue
 		}
 		if _, err := p.shared.dev.Write(bufs[i:i+1], offset); err != nil {
@@ -42,6 +67,11 @@ func (p *tunPath) deliverPackets(bufs [][]byte, offset int) (int, error) {
 		}
 	}
 	return len(bufs), nil
+}
+
+func isPeerProbe(packet []byte) bool {
+	h := ipv4FirstHeader(packet)
+	return h != 0 && packet[9] == 6 && binary.BigEndian.Uint16(packet[h+2:]) == mesh.PeerProbePort
 }
 
 func (p *tunPath) deliverOverlay(packet []byte) bool {
