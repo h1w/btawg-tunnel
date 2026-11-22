@@ -22,7 +22,7 @@ try {
         $test = Join-Path $stage "$suite.test.exe"
         go test -c -o $test $targets[$suite][0]
         if ($LASTEXITCODE -ne 0) { throw "$suite test build failed" }
-        & $test -test.v -test.timeout=120s "-test.run=$($targets[$suite][1])"
+        & $test '-test.v' '-test.timeout=120s' "-test.run=$($targets[$suite][1])"
         if ($LASTEXITCODE -ne 0) { throw "$suite Windows smoke failed" }
     }
 } finally {
