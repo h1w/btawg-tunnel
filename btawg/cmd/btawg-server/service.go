@@ -238,6 +238,13 @@ func runCmd(parent context.Context, args []string) error {
 	defer func() {
 		_ = srv.Close()
 	}()
+	var subscriptionHost string
+	if subscriptionTLS != nil {
+		subscriptionHost, err = subscription.publicHost(srv.Config().ExternalIP, subscriptionTLS)
+		if err != nil {
+			return err
+		}
+	}
 
 	if *dhtBootstrap != "" {
 		srv.SetDHTBootstrap(strings.Split(*dhtBootstrap, ","))
@@ -268,7 +275,7 @@ func runCmd(parent context.Context, args []string) error {
 	var subscriptionServer *http.Server
 	var subscriptionErrors <-chan error
 	if subscriptionTLS != nil {
-		subscriptionServer, subscriptionErrors, err = startSubscription(ctx, p, subscription.SubscriptionHost, subscriptionTLS)
+		subscriptionServer, subscriptionErrors, err = startSubscription(ctx, p, subscriptionHost, subscriptionTLS)
 		if err != nil {
 			return err
 		}

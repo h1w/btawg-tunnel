@@ -602,25 +602,31 @@ the pinned mutual TLS keys authenticate each encrypted connection.
 
 The hub can serve private `btawg://` profiles directly over HTTPS on **TCP
 2228**. This listener is separate from the admin panel and VPN listeners.
-Point a stable public DNS name at the hub and allow inbound TCP 2228. Supply
-a PEM certificate chain trusted by the clients and a matching PEM private
-key. The certificate must cover the subscription hostname.
+Allow inbound TCP 2228 and supply a PEM certificate chain trusted by the
+clients and its matching PEM private key. By default the panel issues links
+as `https://<VPS IPv4>:2228/sub/<token>`, using the active hub `ExternalIP`.
+Set **External IP** in the hub web panel if the VPS is behind NAT or the
+auto-detected outbound address is wrong. An IP URL requires that exact
+address as an **IP Subject Alternative Name (SAN)** in the certificate;
+a DNS-only certificate is not valid for an IP URL.
 
-For a managed server, set **Subscription public hostname**, **Subscription
-certificate PEM file** and **Subscription private key PEM file** in the
-server TUI's **Service settings**, or specify them on installation:
+For a managed server, set **Subscription certificate PEM file** and
+**Subscription private key PEM file** in the server TUI's **Service
+settings**, or pass them on installation:
 
 ```sh
 sudo ./btawg-server install \
-  -subscription-host profiles.example.com \
-  -subscription-cert /etc/letsencrypt/live/profiles.example.com/fullchain.pem \
-  -subscription-key /etc/letsencrypt/live/profiles.example.com/privkey.pem
+  -subscription-cert /etc/btawg/tls/fullchain.pem \
+  -subscription-key /etc/btawg/tls/privkey.pem
 ```
 
-Use the same flags with `btawg-server run` in foreground mode. Use absolute
-file paths for the service. After certificate renewal, restart the hub to
-load the new files; existing links remain valid. Leave all three arguments
-unset (or clear all three saved TUI fields) to disable the listener.
+Use the same flags with `btawg-server run` in foreground mode. If you want
+DNS-based URLs instead, set **Subscription host override** or pass
+`-subscription-host profiles.example.com` and use a certificate for that
+name. Use absolute file paths for the managed service. After renewing the
+certificate, restart the hub to load the new files; existing links remain
+valid as long as the address stays the same. Leave all three subscription
+settings blank to disable the listener.
 
 1. In the web panel, go to **Clients → Import config → Issue subscription
    link**, then copy the `https://…:2228/sub/…` URL. Treat it like the private

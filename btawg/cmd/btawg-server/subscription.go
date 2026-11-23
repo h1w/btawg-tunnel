@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/panel"
 )
 
@@ -23,7 +24,7 @@ type subscriptionSettings struct {
 }
 
 func (s *subscriptionSettings) flags(fs *flag.FlagSet) {
-	fs.StringVar(&s.SubscriptionHost, "subscription-host", "", "public HTTPS subscription hostname (TCP 2228)")
+	fs.StringVar(&s.SubscriptionHost, "subscription-host", "", "override the public subscription host (default: hub public IPv4; TCP 2228)")
 	fs.StringVar(&s.SubscriptionCert, "subscription-cert", "", "subscription certificate chain PEM file")
 	fs.StringVar(&s.SubscriptionKey, "subscription-key", "", "subscription private key PEM file")
 }
@@ -47,20 +48,38 @@ func (s subscriptionSettings) loadTLS() (*tls.Config, error) {
 	if s == (subscriptionSettings{}) {
 		return nil, nil
 	}
-	if s.SubscriptionHost == "" || s.SubscriptionCert == "" || s.SubscriptionKey == "" {
-		return nil, errors.New("subscriptions require a public hostname, certificate PEM and private key PEM")
+	if s.SubscriptionCert == "" || s.SubscriptionKey == "" {
+		return nil, errors.New("subscriptions require a certificate PEM and private key PEM")
 	}
-	if !validSubscriptionHost(s.SubscriptionHost) {
-		return nil, errors.New("invalid subscription hostname: use a DNS name or IP address without a scheme or port")
+	if s.SubscriptionHost != "" && !validSubscriptionHost(s.SubscriptionHost) {
+		return nil, errors.New("invalid subscription host: use a DNS name or IP address without a scheme or port")
 	}
 	cert, err := tls.LoadX509KeyPair(s.SubscriptionCert, s.SubscriptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("subscription TLS: %w", err)
 	}
-	if err := cert.Leaf.VerifyHostname(s.SubscriptionHost); err != nil {
-		return nil, fmt.Errorf("subscription TLS hostname: %w", err)
+	if s.SubscriptionHost != "" {
+		if err := cert.Leaf.VerifyHostname(s.SubscriptionHost); err != nil {
+			return nil, fmt.Errorf("subscription TLS host: %w", err)
+		}
 	}
 	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}, nil
+}
+
+// publicHost resolves the default only once the hub's active address is known.
+// An explicit override has already been checked by loadTLS.
+func (s subscriptionSettings) publicHost(externalIP string, tlsConfig *tls.Config) (string, error) {
+	if s.SubscriptionHost != "" {
+		return s.SubscriptionHost, nil
+	}
+	ip, err := netip.ParseAddr(externalIP)
+	if err != nil || !config.PublicIPv4(ip) {
+		return "", errors.New("subscriptions need the hub's public IPv4; set ExternalIP or -subscription-host")
+	}
+	if err := tlsConfig.Certificates[0].Leaf.VerifyHostname(externalIP); err != nil {
+		return "", fmt.Errorf("subscription certificate must include the hub IP in its IP SAN: %w", err)
+	}
+	return externalIP, nil
 }
 
 func validSubscriptionHost(host string) bool {

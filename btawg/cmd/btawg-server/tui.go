@@ -36,12 +36,12 @@ func serverSetup() (*service.Screen, error) {
 	}
 	return &service.Screen{
 		Title: "Server settings", Submit: "Save settings",
-		Text: "Saving changes restarts a running service. Set all three subscription fields for HTTPS on TCP 2228, or leave all three blank.",
+		Text: "Saving changes restarts a running service. Set both PEM files for HTTPS on TCP 2228. A blank subscription host uses the hub's public IPv4.",
 		Fields: []service.Field{
 			{Label: "Database path", Value: launch.Store},
 			{Label: "TUN interface", Value: launch.TUNName},
 			{Label: "Userspace only (no TUN)", Toggle: true, Checked: launch.NoTUN},
-			{Label: "Subscription public hostname", Value: launch.SubscriptionHost},
+			{Label: "Subscription host override (optional)", Value: launch.SubscriptionHost},
 			{Label: "Subscription certificate PEM file", Value: launch.SubscriptionCert},
 			{Label: "Subscription private key PEM file", Value: launch.SubscriptionKey},
 		},

@@ -26,7 +26,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 	reg := &fakeRegistry{Store: st, activeConfig: config.DefaultServerConfig()}
 	reg.activeConfig.ExternalIP = "192.0.2.10"
 	p := New(st, reg, "admin", string(hash))
-	public := httptest.NewTLSServer(p.SubscriptionHandler("profiles.example.org"))
+	public := httptest.NewTLSServer(p.SubscriptionHandler("192.0.2.10"))
 	defer public.Close()
 	admin := httptest.NewServer(p.Handler())
 	defer admin.Close()
@@ -57,7 +57,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 		if err != nil || r.StatusCode != 200 {
 			t.Fatalf("import page: status %d, read %v", r.StatusCode, err)
 		}
-		_, tail, ok := strings.Cut(string(b), "https://profiles.example.org:2228/sub/")
+		_, tail, ok := strings.Cut(string(b), "https://192.0.2.10:2228/sub/")
 		if !ok {
 			t.Fatal("subscription URL missing from import page")
 		}
@@ -82,7 +82,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 		}
 		return string(b)
 	}
-	check := func(path, addr string) {
+	check := func(path, clientID, addr string) {
 		t.Helper()
 		raw := get(path, 200)
 		if !strings.HasSuffix(raw, "\n") || strings.Count(raw, "\n") != 1 {
@@ -92,7 +92,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatal("response is not a btawg import")
 		}
-		rec, err := st.GetClient(id)
+		rec, err := st.GetClient(clientID)
 		if err != nil || !strings.HasPrefix(cfg.CarrierEndpoint, addr+":") || cfg.ClientPrivKey != rec.PrivKey || cfg.ClientIP != rec.IP {
 			t.Fatal("response does not match the active hub and enrolled client")
 		}
@@ -102,14 +102,21 @@ func TestSubscriptionLifecycle(t *testing.T) {
 	post("/clients/subscription", id, "wrong", 403)
 	post("/clients/subscription", id, csrf, 302)
 	first := link(importPage)
+	other := createClientForTest(t, c, admin.URL, "deleted")
+	post("/clients/subscription", other, csrf, 302)
+	otherLink := link("/clients/import?id=" + other)
+	if first == otherLink {
+		t.Fatal("different clients received the same subscription URL")
+	}
+	check(otherLink, other, "192.0.2.10")
 	pending := reg.activeConfig
 	pending.ExternalIP = "192.0.2.99"
 	if err := st.SaveServerConfig(pending); err != nil {
 		t.Fatal(err)
 	}
-	check(first, "192.0.2.10")
+	check(first, id, "192.0.2.10")
 	reg.activeConfig.ExternalIP = "192.0.2.11"
-	check(first, "192.0.2.11")
+	check(first, id, "192.0.2.11")
 
 	// Reconstruct the download handler from a reopened database.
 	public.Close()
@@ -123,7 +130,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 	}
 	reg.Store = st
 	p = New(st, reg, "admin", string(hash))
-	public = httptest.NewTLSServer(p.SubscriptionHandler("profiles.example.org"))
+	public = httptest.NewTLSServer(p.SubscriptionHandler("192.0.2.10"))
 	defer public.Close()
 	admin = httptest.NewServer(p.Handler())
 	defer admin.Close()
@@ -132,17 +139,14 @@ func TestSubscriptionLifecycle(t *testing.T) {
 	if link(importPage) != first {
 		t.Fatal("subscription link changed after reopening the store")
 	}
-	check(first, "192.0.2.11")
+	check(first, id, "192.0.2.11")
 	post("/clients/subscription", id, csrf, 302)
 	second := link(importPage)
 	get(first, 404)
-	check(second, "192.0.2.11")
+	check(second, id, "192.0.2.11")
 	post("/clients/revoke", id, csrf, 302)
 	get(second, 404)
 
-	other := createClientForTest(t, c, admin.URL, "deleted")
-	post("/clients/subscription", other, csrf, 302)
-	otherLink := link("/clients/import?id=" + other)
 	post("/clients/delete", other, csrf, 302)
 	get(otherLink, 404)
 }
