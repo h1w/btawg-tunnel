@@ -73,4 +73,5 @@ Legacy flags are accepted on the bare command or on run:
   -subscription-host HOST  override the subscription host (default: public IPv4)
   -subscription-cert PATH  certificate chain PEM file
   -subscription-key PATH   private key PEM file
+  -subscription-auto[=false] automatic IP TLS via HTTP-01 (on for managed hubs)
 `

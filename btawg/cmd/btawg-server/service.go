@@ -184,10 +184,6 @@ func runCmd(parent context.Context, args []string) error {
 	}
 	launch.subscriptionSettings.overrideFlags(fs, subscription)
 	subscription = launch.subscriptionSettings
-	subscriptionTLS, err := subscription.loadTLS()
-	if err != nil {
-		return err
-	}
 	if *storePath == "" {
 		*storePath = "btawg.db"
 	}
@@ -238,13 +234,6 @@ func runCmd(parent context.Context, args []string) error {
 	defer func() {
 		_ = srv.Close()
 	}()
-	var subscriptionHost string
-	if subscriptionTLS != nil {
-		subscriptionHost, err = subscription.publicHost(srv.Config().ExternalIP, subscriptionTLS)
-		if err != nil {
-			return err
-		}
-	}
 
 	if *dhtBootstrap != "" {
 		srv.SetDHTBootstrap(strings.Split(*dhtBootstrap, ","))
@@ -272,15 +261,8 @@ func runCmd(parent context.Context, args []string) error {
 	}
 
 	p := panel.New(st, srv, "admin", cfg.AdminPassHash)
-	var subscriptionServer *http.Server
-	var subscriptionErrors <-chan error
-	if subscriptionTLS != nil {
-		subscriptionServer, subscriptionErrors, err = startSubscription(ctx, p, subscriptionHost, subscriptionTLS)
-		if err != nil {
-			return err
-		}
-		defer subscriptionServer.Close()
-		fmt.Printf("btawg-server: HTTPS subscriptions on TCP :%d\n", panel.SubscriptionPort)
+	if closeSubscriptions := serveSubscriptions(ctx, p, st, subscription, srv.Config().ExternalIP, *managed); closeSubscriptions != nil {
+		defer closeSubscriptions()
 	}
 	web := &http.Server{Handler: p.Handler(), ReadHeaderTimeout: 5 * time.Second}
 	defer web.Close()
@@ -308,16 +290,10 @@ func runCmd(parent context.Context, args []string) error {
 	case <-ctx.Done():
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		var subscriptionErr error
-		if subscriptionServer != nil {
-			subscriptionErr = subscriptionServer.Shutdown(shutdown)
-		}
-		return errors.Join(subscriptionErr, web.Shutdown(shutdown))
+		return web.Shutdown(shutdown)
 	case err := <-errCh:
 		return err
 	case err := <-webErrors:
-		return err
-	case err := <-subscriptionErrors:
 		return err
 	}
 }

@@ -26,7 +26,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 	reg := &fakeRegistry{Store: st, activeConfig: config.DefaultServerConfig()}
 	reg.activeConfig.ExternalIP = "192.0.2.10"
 	p := New(st, reg, "admin", string(hash))
-	public := httptest.NewTLSServer(p.SubscriptionHandler("192.0.2.10"))
+	public := httptest.NewTLSServer(p.SubscriptionHandler("192.0.2.10", nil))
 	defer public.Close()
 	admin := httptest.NewServer(p.Handler())
 	defer admin.Close()
@@ -130,7 +130,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 	}
 	reg.Store = st
 	p = New(st, reg, "admin", string(hash))
-	public = httptest.NewTLSServer(p.SubscriptionHandler("192.0.2.10"))
+	public = httptest.NewTLSServer(p.SubscriptionHandler("192.0.2.10", nil))
 	defer public.Close()
 	admin = httptest.NewServer(p.Handler())
 	defer admin.Close()

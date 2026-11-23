@@ -600,33 +600,36 @@ the pinned mutual TLS keys authenticate each encrypted connection.
 
 ## HTTPS profile subscriptions
 
-The hub can serve private `btawg://` profiles directly over HTTPS on **TCP
-2228**. This listener is separate from the admin panel and VPN listeners.
-Allow inbound TCP 2228 and supply a PEM certificate chain trusted by the
-clients and its matching PEM private key. By default the panel issues links
-as `https://<VPS IPv4>:2228/sub/<token>`, using the active hub `ExternalIP`.
-Set **External IP** in the hub web panel if the VPS is behind NAT or the
-auto-detected outbound address is wrong. An IP URL requires that exact
-address as an **IP Subject Alternative Name (SAN)** in the certificate;
-a DNS-only certificate is not valid for an IP URL.
+On managed hubs, subscriptions use **automatic Let's Encrypt TLS** by default.
+No domain, Certbot, or manually generated PEM files are needed. Leave the PEM
+fields blank. The hub requests a short-lived certificate for its public IPv4
+and renews it in the background without restarting the VPN. Updating an
+existing managed hub enables this default on the next service start.
 
-For a managed server, set **Subscription certificate PEM file** and
-**Subscription private key PEM file** in the server TUI's **Service
-settings**, or pass them on installation:
+- Allow inbound **TCP 80** for HTTP-01 validation and **TCP 2228** for profile
+  downloads. Allow outbound HTTPS to Let's Encrypt. Port 80 must be free for
+  btawg during issuance and renewal; it serves only the active challenge, not
+  the admin panel or profiles. btawg does not change firewall rules.
+- The URL is `https://<VPS IPv4>:2228/sub/<token>`. Set **External IP** in the
+  server panel and restart the hub if the default outbound IPv4 is wrong
+  (for example, behind NAT). The public IP must forward both required ports.
+- **Profile subscription** shows pending issuance or errors. Issuance and TLS
+  listener failures do not stop the VPN. Reload the import page after the
+  certificate is ready. Renewals keep the same URL and token.
 
-```sh
-sudo ./btawg-server install \
-  -subscription-cert /etc/btawg/tls/fullchain.pem \
-  -subscription-key /etc/btawg/tls/privkey.pem
-```
+Automatic mode registers a Let's Encrypt account under the
+[Subscriber Agreement](https://letsencrypt.org/repository/). For a foreground
+hub, opt in with `btawg-server run -subscription-auto`. To disable automatic
+issuance on a managed hub, turn off **Automatic subscription certificates** in
+the server TUI or install with `-subscription-auto=false`.
 
-Use the same flags with `btawg-server run` in foreground mode. If you want
-DNS-based URLs instead, set **Subscription host override** or pass
-`-subscription-host profiles.example.com` and use a certificate for that
-name. Use absolute file paths for the managed service. After renewing the
-certificate, restart the hub to load the new files; existing links remain
-valid as long as the address stays the same. Leave all three subscription
-settings blank to disable the listener.
+If you already have a certificate or want a DNS name instead of an IP URL,
+set both subscription PEM files in the server TUI's **Service settings** or
+pass `-subscription-cert` and `-subscription-key`. These take precedence over
+automatic issuance. For DNS, also set **Subscription host override** or
+`-subscription-host profiles.example.com`. A manual IP certificate must include
+the exact IP as an IP SAN. Use a chain trusted by clients, absolute file paths,
+and restart the hub to load renewed manual certificates.
 
 1. In the web panel, go to **Clients → Import config → Issue subscription
    link**, then copy the `https://…:2228/sub/…` URL. Treat it like the private

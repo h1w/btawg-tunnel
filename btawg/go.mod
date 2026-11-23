@@ -13,8 +13,8 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/grindlemire/go-tui v0.24.0
 	go.etcd.io/bbolt v1.5.0
-	golang.org/x/crypto v0.44.0
-	golang.org/x/net v0.47.0
+	golang.org/x/crypto v0.59.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.50.0
 	golang.org/x/term v0.48.0
 )

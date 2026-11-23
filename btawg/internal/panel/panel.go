@@ -61,7 +61,8 @@ type Panel struct {
 	user string
 	pass []byte // bcrypt hash
 
-	subscriptionBase string
+	subscriptionBase   string
+	subscriptionStatus func() (ready bool, message string)
 
 	mu        sync.Mutex
 	sessions  map[string]*session
@@ -531,7 +532,8 @@ func (p *Panel) clientImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var subscription string
-	if p.subscriptionBase != "" {
+	ready, status := p.subscriptionReadiness()
+	if ready {
 		token, err := p.st.SubscriptionToken(rec.ID)
 		if err != nil {
 			http.Error(w, "subscription unavailable", http.StatusInternalServerError)
@@ -542,12 +544,13 @@ func (p *Panel) clientImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	p.render(w, "import", map[string]any{
-		"CSRF":                p.session(r).csrf,
-		"Client":              rec,
-		"Import":              s,
-		"Active":              "clients",
-		"SubscriptionEnabled": p.subscriptionBase != "",
-		"SubscriptionURL":     subscription,
+		"CSRF":               p.session(r).csrf,
+		"Client":             rec,
+		"Import":             s,
+		"Active":             "clients",
+		"SubscriptionReady":  ready,
+		"SubscriptionStatus": status,
+		"SubscriptionURL":    subscription,
 	})
 }
 

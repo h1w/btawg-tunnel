@@ -15,11 +15,22 @@ import (
 // SubscriptionPort is the public TLS port for profile downloads.
 const SubscriptionPort = 2228
 
-// SubscriptionHandler enables the subscription controls and returns the handler
-// for the separate HTTPS listener. Call it before serving the admin panel.
-func (p *Panel) SubscriptionHandler(host string) http.Handler {
-	p.subscriptionBase = "https://" + net.JoinHostPort(host, strconv.Itoa(SubscriptionPort)) + "/sub/"
+// SubscriptionHandler configures the panel before it starts serving and
+// returns the separate public HTTPS handler. Status is safe to call from any request.
+func (p *Panel) SubscriptionHandler(host string, status func() (bool, string)) http.Handler {
+	if host != "" {
+		p.subscriptionBase = "https://" + net.JoinHostPort(host, strconv.Itoa(SubscriptionPort)) + "/sub/"
+	}
+	p.subscriptionStatus = status
 	return http.HandlerFunc(p.downloadSubscription)
+}
+
+func (p *Panel) subscriptionReadiness() (bool, string) {
+	if p.subscriptionStatus != nil {
+		ready, message := p.subscriptionStatus()
+		return ready && p.subscriptionBase != "", message
+	}
+	return p.subscriptionBase != "", ""
 }
 
 func (p *Panel) clientProfile(rec store.ClientRecord) (string, error) {
@@ -33,6 +44,10 @@ func (p *Panel) clientProfile(rec store.ClientRecord) (string, error) {
 func (p *Panel) rotateSubscription(w http.ResponseWriter, r *http.Request) {
 	if p.subscriptionBase == "" {
 		http.NotFound(w, r)
+		return
+	}
+	if ready, _ := p.subscriptionReadiness(); !ready {
+		http.Error(w, "subscription HTTPS is not ready", http.StatusServiceUnavailable)
 		return
 	}
 	id := r.PostFormValue("id")

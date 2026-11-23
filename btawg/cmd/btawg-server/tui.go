@@ -36,7 +36,7 @@ func serverSetup() (*service.Screen, error) {
 	}
 	return &service.Screen{
 		Title: "Server settings", Submit: "Save settings",
-		Text: "Saving changes restarts a running service. Set both PEM files for HTTPS on TCP 2228. A blank subscription host uses the hub's public IPv4.",
+		Text: "Automatic subscription HTTPS uses the public IPv4 and TCP 80 for validation. Leave the PEM fields blank for automatic certificates. Saving changes restarts a running hub.",
 		Fields: []service.Field{
 			{Label: "Database path", Value: launch.Store},
 			{Label: "TUN interface", Value: launch.TUNName},
@@ -44,6 +44,7 @@ func serverSetup() (*service.Screen, error) {
 			{Label: "Subscription host override (optional)", Value: launch.SubscriptionHost},
 			{Label: "Subscription certificate PEM file", Value: launch.SubscriptionCert},
 			{Label: "Subscription private key PEM file", Value: launch.SubscriptionKey},
+			{Label: "Automatic subscription certificates", Toggle: true, Checked: launch.automatic(true)},
 		},
 		Save: func(fields []service.Field) (*service.Screen, error) {
 			launch.Store, launch.TUNName = strings.TrimSpace(fields[0].Value), strings.TrimSpace(fields[1].Value)
@@ -51,6 +52,7 @@ func serverSetup() (*service.Screen, error) {
 			launch.SubscriptionHost = strings.TrimSpace(fields[3].Value)
 			launch.SubscriptionCert = strings.TrimSpace(fields[4].Value)
 			launch.SubscriptionKey = strings.TrimSpace(fields[5].Value)
+			launch.SubscriptionAuto = new(fields[6].Checked)
 			return nil, launch.save()
 		},
 	}, nil
