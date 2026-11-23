@@ -61,6 +61,7 @@ func TestManagedDirectTUNWithHubRevocation(t *testing.T) {
 	go hub.Run(ctx)
 	for _, cfg := range []*config.ClientConfig{&a, &b} {
 		cfg.ServerPubKey = hub.PubKey()
+		cfg.Profile = hub.Config().AWGProfile
 		cfg.Transport = config.ModeWG
 		cfg.WGEndpoint = netip.AddrPortFrom(netip.MustParseAddr(sc.ExternalIP), uint16(sc.WGPort)).String()
 		cfg.CarrierEndpoint = netip.AddrPortFrom(netip.MustParseAddr(sc.ExternalIP), uint16(sc.CarrierPort)).String()

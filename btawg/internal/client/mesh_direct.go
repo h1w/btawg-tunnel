@@ -301,7 +301,7 @@ func (n *meshNode) runPeer(ctx context.Context, sockets *peerSockets, id directI
 	ep := bind.Endpoint(p.IP)
 	profile := ""
 	if p.Mode != config.ModeWG {
-		profile = n.owner.cfg.Profile.String()
+		profile = n.owner.cfg.Profile.DeviceIPC()
 	}
 	cfg := fmt.Sprintf("private_key=%s\n%spublic_key=%s\nallowed_ip=%s/32\nendpoint=%s\n", id.private, profile, p.Key, p.IP, ep.DstToString())
 	if d.IpcSet(cfg) != nil || d.Up() != nil {
@@ -309,7 +309,11 @@ func (n *meshNode) runPeer(ctx context.Context, sockets *peerSockets, id directI
 	}
 	b.Attach(ep, tr)
 	if p.Initiator {
-		if d.IpcSet(fmt.Sprintf("public_key=%s\npersistent_keepalive_interval=5\n", p.Key)) != nil {
+		keepalive := "5"
+		if custom := n.owner.cfg.Profile.PersistentKeepalive; p.Mode != config.ModeWG && custom != "" {
+			keepalive = string(custom)
+		}
+		if d.IpcSet(fmt.Sprintf("public_key=%s\npersistent_keepalive_interval=%s\n", p.Key, keepalive)) != nil {
 			return
 		}
 		if remote := d.LookupPeer(key); remote != nil {

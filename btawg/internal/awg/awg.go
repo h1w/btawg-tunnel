@@ -52,11 +52,14 @@ func DerivePubKey(privHex string) (string, error) {
 func ClientConf(c config.ClientConfig) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "private_key=%s\n", c.ClientPrivKey)
-	b.WriteString(c.Profile.String())
+	b.WriteString(c.Profile.DeviceIPC())
 	b.WriteString("replace_peers=true\n")
 	fmt.Fprintf(&b, "public_key=%s\n", c.ServerPubKey)
 	b.WriteString("allowed_ip=0.0.0.0/0\n")
 	fmt.Fprintf(&b, "endpoint=%s:%d\n", c.ServerIP, EndpointPort)
+	if keepalive := c.Profile.PersistentKeepalive; keepalive != "" {
+		fmt.Fprintf(&b, "persistent_keepalive_interval=%s\n", keepalive)
+	}
 	return b.String()
 }
 
@@ -79,9 +82,6 @@ func PeerID(pubKeyHex string) string {
 	sum := sha256.Sum256(pub)
 	return hex.EncodeToString(sum[:20])
 }
-
-// ProfileString renders the AWG obfuscation profile in IpcSet form.
-func ProfileString(p config.AWGProfile) string { return p.String() }
 
 // PeerIDBytes converts a 40-char hex peer ID to its 20-byte form.
 func PeerIDBytes(hexID string) ([20]byte, error) {

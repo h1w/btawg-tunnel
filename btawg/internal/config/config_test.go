@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,9 +30,9 @@ func testClientConfig() ClientConfig {
 }
 
 func TestProfileString(t *testing.T) {
-	got := DefaultProfile().String()
+	got := DefaultProfile().DeviceIPC()
 	if got != wantProfileString {
-		t.Fatalf("DefaultProfile().String() = %q, want %q", got, wantProfileString)
+		t.Fatalf("DefaultProfile().DeviceIPC() = %q, want %q", got, wantProfileString)
 	}
 }
 
@@ -50,6 +51,17 @@ func TestImportRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, orig) {
 		t.Fatalf("round trip mismatch:\n got %+v\nwant %+v", got, orig)
+	}
+}
+
+func TestImportWithoutAWGProfileUsesLegacyDefaults(t *testing.T) {
+	const legacy = `{"version":1,"transport":"ext-tcp"}`
+	cfg, err := ParseImportString(ImportPrefix + base64.RawURLEncoding.EncodeToString([]byte(legacy)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Profile.DeviceIPC(); got != wantProfileString {
+		t.Fatalf("legacy AWG profile = %q, want %q", got, wantProfileString)
 	}
 }
 
@@ -288,6 +300,33 @@ func TestNativeConfigRendersQuickINI(t *testing.T) {
 		if strings.Contains(conf, cfg.ClientPrivKey) || strings.Contains(conf, cfg.ServerPubKey) {
 			t.Fatal("native export contained hex keys instead of base64")
 		}
+	}
+}
+
+func TestNativeAWGAdvancedProfileDoesNotReachWG(t *testing.T) {
+	cfg := testClientConfig()
+	cfg.AWGEndpoint = "203.0.113.7:51821"
+	cfg.WGEndpoint = "203.0.113.7:51820"
+	cfg.Routes = []string{"10.77.0.0/24"}
+	cfg.Profile.HeaderProtectionKey = strings.Repeat("01", 32)
+	cfg.Profile.H1 = "1000-1099"
+	cfg.Profile.RandomTrailers = true
+	cfg.Profile.PersistentKeepalive = "20-30"
+	awg, err := cfg.NativeConfig(ModeAWG)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{"HeaderProtectionKey = AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=", "H1 = 1000-1099", "RandomTrailers = on", "PersistentKeepalive = 20-30"} {
+		if !strings.Contains(awg, line+"\n") {
+			t.Fatalf("native AWG config missing %s", strings.SplitN(line, " = ", 2)[0])
+		}
+	}
+	wg, err := cfg.NativeConfig(ModeWG)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(wg, "HeaderProtectionKey") || strings.Contains(wg, "RandomTrailers") || !strings.Contains(wg, "PersistentKeepalive = 25\n") {
+		t.Fatal("native WireGuard config inherited AWG options")
 	}
 }
 

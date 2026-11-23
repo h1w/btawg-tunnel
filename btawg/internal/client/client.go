@@ -5,6 +5,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/netip"
@@ -24,6 +25,7 @@ import (
 	"bittorrent-tunnel/btawg/internal/carrier"
 	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/dht"
+	"bittorrent-tunnel/btawg/internal/iptunnel"
 	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
@@ -148,6 +150,7 @@ func (c *Client) start(tunDev tun.Device) error {
 		ipc, err = c.cfg.NativeDeviceConfig(mode)
 	} else {
 		ipc = awg.ClientConf(c.cfg)
+		err = c.cfg.Profile.Validate()
 	}
 	if err != nil {
 		c.dev.Close()
@@ -358,6 +361,7 @@ func (c *Client) runTunnel(ctx context.Context, active *atomic.Pointer[carrierHe
 				active.Store(nil)
 			}
 			c.bind.(*carrierbind.Bind).Detach(serverEp)
+			t.Wait()
 			select {
 			case <-ctx.Done():
 				return nil
@@ -368,6 +372,7 @@ func (c *Client) runTunnel(ctx context.Context, active *atomic.Pointer[carrierHe
 				active.Store(nil)
 			}
 			c.bind.(*carrierbind.Bind).Detach(serverEp)
+			t.Wait()
 			return nil
 		}
 	}
@@ -441,9 +446,33 @@ func (c *Client) connectCarrier(ctx context.Context, addr netip.AddrPort) (carri
 	var t carrier.Transport
 	switch config.CarrierFraming(c.cfg.Transport) {
 	case "ext":
-		t, _, err = carrier.NewExtended(conn, infoHash, peerID)
+		if config.IsTLSMode(c.cfg.Transport) {
+			t, _, err = carrier.NewExtended(conn, infoHash, peerID)
+		} else {
+			t, _, err = carrier.NewHubExtended(conn, infoHash, peerID, c.cfg.TLSServerKey != "")
+		}
 	case "req":
-		t, _, err = carrier.NewRequestPiece(conn, infoHash, peerID, false)
+		if config.IsTLSMode(c.cfg.Transport) {
+			t, _, err = carrier.NewRequestPiece(conn, infoHash, peerID, false)
+		} else {
+			t, _, err = carrier.NewHubRequestPiece(conn, infoHash, peerID, false)
+		}
+	}
+	base := t
+	if err == nil && carrier.ExtendedExperiment(t) != "" {
+		t, err = c.protectCarrier(ctx, conn, base, carrier.ExtendedExperiment(base))
+		if err != nil {
+			base.Wait()
+		}
+	}
+	if err == nil && !config.IsTLSMode(c.cfg.Transport) {
+		var timed carrier.Transport
+		timed, err = carrier.WithTiming(t, base)
+		if err == nil {
+			t = timed
+		} else {
+			t.Wait()
+		}
 	}
 	if err != nil {
 		conn.Close()
@@ -465,6 +494,22 @@ func (c *Client) connectCarrier(ctx context.Context, addr netip.AddrPort) (carri
 		}
 	}
 	return t, conn, nil
+}
+
+func (c *Client) protectCarrier(ctx context.Context, raw net.Conn, base carrier.Transport, mode string) (carrier.Transport, error) {
+	id, err := iptunnel.NewIdentity(c.cfg.ClientPrivKey, iptunnel.Client)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := id.TLS(c.cfg.TLSServerKey)
+	if err != nil {
+		return nil, err
+	}
+	secure := tls.Client(iptunnel.Stream(raw, base), cfg)
+	if err := secure.HandshakeContext(ctx); err != nil {
+		return nil, fmt.Errorf("protected carrier authentication: %w", err)
+	}
+	return iptunnel.SecureDatagramRecords(secure, base, mode)
 }
 
 // Close tears the client down.

@@ -2,22 +2,28 @@ package carrier
 
 import (
 	"bufio"
-	"crypto/rand"
+	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"math/rand/v2"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Each endpoint advertises one half of the virtual index space. Indices cycle
 // after the outstanding requests have drained past them.
 const (
-	legacyRequestWindow   = 32
-	wideRequestFeature    = 1
-	compactRequestFeature = 2
-	compactBlockSize      = 1536
-	pieceContinuation     = 1 << 15
+	legacyRequestWindow      = 32
+	wideRequestFeature       = 1
+	compactRequestFeature    = 2
+	windowRequestFeature     = 4
+	variedRequestFeature     = 8
+	autoVariedRequestFeature = 16 // optional; old peers ignore it
+	compactBlockSize         = 1536
+	pieceContinuation        = 1 << 15
 	// One credit carries one datagram. 12,288 credits leave room for 500
 	// Mbit/s of full-sized TCP payloads at 200 ms RTT.
 	requestWindow = 12288
@@ -31,7 +37,9 @@ type request uint32
 type requestPieceCarrier struct {
 	c            net.Conn
 	writeMu      sync.Mutex
-	sendMu       sync.Mutex // keep fragments of one datagram adjacent
+	sendMu       sync.Mutex
+	stateMu      sync.Mutex
+	rndMu        sync.Mutex
 	pieceFrame   [13 + BlockSize]byte
 	pieceBatch   []byte
 	requests     chan request
@@ -41,72 +49,155 @@ type requestPieceCarrier struct {
 	once         sync.Once
 	wg           sync.WaitGroup
 	pending      map[uint32]bool
+	outBegin     map[uint32]uint32
+	outLen       map[uint32]int
+	inBegin      map[uint32]uint32
+	inLen        map[uint32]int
 	next         uint32
-	window       int
+	window       int // negotiated maximum in-flight requests
+	curWindow    int // current adaptive in-flight limit
+	fastCount    int // full-window consumption events in the current epoch
 	blockSize    int
+	experiment   byte
+	ownOdd       bool
 	invalid      atomic.Int64
+	rnd          *rand.Rand
+}
+
+// RequestFeatures reads the BTAWG_REQ_EXPERIMENT environment variable and
+// returns the feature byte this process advertises for request/piece carriers.
+// The baseline always includes wide blocks and compact blocks; window and
+// varied are added when the corresponding experiment is enabled. Varied
+// implies window.
+func RequestFeatures() (byte, error) {
+	features := byte(wideRequestFeature | compactRequestFeature)
+	switch os.Getenv("BTAWG_REQ_EXPERIMENT") {
+	case "":
+		features |= autoVariedRequestFeature
+	case "baseline":
+	case "window":
+		features |= windowRequestFeature
+	case "varied":
+		features |= windowRequestFeature | variedRequestFeature
+	default:
+		return 0, fmt.Errorf("invalid BTAWG_REQ_EXPERIMENT value %q (want baseline, window, or varied)", os.Getenv("BTAWG_REQ_EXPERIMENT"))
+	}
+	return features, nil
+}
+
+func validateRequestFeatures(local, remote byte) error {
+	exp := byte(windowRequestFeature | variedRequestFeature)
+	if local&exp != remote&exp {
+		return fmt.Errorf("request/piece experiment mismatch: local=%02x remote=%02x", local, remote)
+	}
+	return nil
 }
 
 // NewRequestPiece wraps an established connection with BEP 3 request/piece
-// framing (message ids: 1 unchoke, 2 interested, 5 bitfield, 6 request,
-// 7 piece). ownOdd selects which half of the virtual file this endpoint
-// advertises; the two ends of one connection must pass opposite values. The
-// peer's handshake ID is returned for caller-side routing.
+// framing for direct peers. It advertises only the baseline wide|compact
+// features and rejects peers that require the window/varied experiments.
 func NewRequestPiece(c net.Conn, infoHash, peerID [20]byte, ownOdd bool) (Transport, [20]byte, error) {
-	theirs, features, err := handshake(c, infoHash, peerID, wideRequestFeature|compactRequestFeature)
+	local := byte(wideRequestFeature | compactRequestFeature)
+	theirs, peerFeatures, err := handshake(c, infoHash, peerID, local)
 	if err != nil {
 		return nil, theirs, err
 	}
-	window := legacyRequestWindow
-	if features&wideRequestFeature != 0 {
-		window = requestWindow
+	if err := validateRequestFeatures(local, peerFeatures); err != nil {
+		c.Close()
+		return nil, theirs, err
 	}
-	blockSize := BlockSize
-	if features&compactRequestFeature != 0 {
-		blockSize = compactBlockSize
-	}
-	x := &requestPieceCarrier{
-		c:            c,
-		requests:     make(chan request, window),
-		replacements: make(chan [17]byte, window),
-		received:     make(chan []byte, receiveQueuePackets),
-		done:         make(chan struct{}),
-		pending:      make(map[uint32]bool, window),
-		window:       window,
-		blockSize:    blockSize,
-	}
+	x := newRequestPieceCarrier(c, local, peerFeatures)
 	x.start(ownOdd)
 	return x, theirs, nil
 }
 
-// acceptRequestPiece finishes a server-side request/piece carrier after the
-// initial BitTorrent handshake has already been consumed by Accept. The server
-// advertises the odd half of the virtual index space to match the legacy
-// server role; connecting clients must use the even half (ownOdd=false).
-func acceptRequestPiece(c net.Conn, theirs [20]byte, peerFeatures byte) (Transport, error) {
-	window := legacyRequestWindow
-	if peerFeatures&wideRequestFeature != 0 {
-		window = requestWindow
+// NewHubRequestPiece is the hub/client entrypoint for the request/piece
+// carrier. It reads BTAWG_REQ_EXPERIMENT, advertises the configured feature
+// bits, and fails closed when the peer does not match.
+func NewHubRequestPiece(c net.Conn, infoHash, peerID [20]byte, ownOdd bool) (Transport, [20]byte, error) {
+	var zero [20]byte
+	local, err := RequestFeatures()
+	if err != nil {
+		return nil, zero, err
 	}
-	blockSize := BlockSize
-	if peerFeatures&compactRequestFeature != 0 {
-		blockSize = compactBlockSize
+	theirs, peerFeatures, err := handshake(c, infoHash, peerID, local)
+	if err != nil {
+		return nil, theirs, err
 	}
-	x := &requestPieceCarrier{
-		c:            c,
-		requests:     make(chan request, window),
-		replacements: make(chan [17]byte, window),
-		received:     make(chan []byte, receiveQueuePackets),
-		done:         make(chan struct{}),
-		pending:      make(map[uint32]bool, window),
-		window:       window,
-		blockSize:    blockSize,
+	if err := validateRequestFeatures(local, peerFeatures); err != nil {
+		c.Close()
+		return nil, theirs, err
 	}
+	x := newRequestPieceCarrier(c, local, peerFeatures)
+	x.start(ownOdd)
+	return x, theirs, nil
+}
+
+// acceptRequestPiece finishes a server-side direct request/piece carrier after
+// the initial BitTorrent handshake has already been consumed by Accept. It
+// uses the baseline feature set and rejects experimental peers.
+func acceptRequestPiece(c net.Conn, peerFeatures byte) (Transport, error) {
+	local := byte(wideRequestFeature | compactRequestFeature)
+	if err := validateRequestFeatures(local, peerFeatures); err != nil {
+		c.Close()
+		return nil, err
+	}
+	x := newRequestPieceCarrier(c, local, peerFeatures)
 	x.start(true)
 	return x, nil
 }
 
+// acceptHubRequestPiece finishes a server-side hub request/piece carrier. The
+// caller obtains local features from RequestFeatures and has already written
+// them into the handshake.
+func acceptHubRequestPiece(c net.Conn, local, remote byte) (Transport, error) {
+	if err := validateRequestFeatures(local, remote); err != nil {
+		c.Close()
+		return nil, err
+	}
+	x := newRequestPieceCarrier(c, local, remote)
+	x.start(true)
+	return x, nil
+}
+
+func newRequestPieceCarrier(c net.Conn, local, remote byte) *requestPieceCarrier {
+	blockSize := BlockSize
+	if remote&compactRequestFeature != 0 {
+		blockSize = compactBlockSize
+	}
+	maxWindow := legacyRequestWindow
+	if remote&wideRequestFeature != 0 {
+		maxWindow = requestWindow
+	}
+	experiment := local & (windowRequestFeature | variedRequestFeature)
+	if local&remote&autoVariedRequestFeature != 0 {
+		experiment = windowRequestFeature | variedRequestFeature
+	}
+	curWindow := maxWindow
+	if experiment != 0 {
+		curWindow = legacyRequestWindow
+	}
+	return &requestPieceCarrier{
+		c:            c,
+		requests:     make(chan request, maxWindow),
+		replacements: make(chan [17]byte, maxWindow),
+		received:     make(chan []byte, receiveQueuePackets),
+		done:         make(chan struct{}),
+		pending:      make(map[uint32]bool, maxWindow),
+		outBegin:     make(map[uint32]uint32),
+		outLen:       make(map[uint32]int),
+		inBegin:      make(map[uint32]uint32),
+		inLen:        make(map[uint32]int),
+		window:       maxWindow,
+		curWindow:    curWindow,
+		blockSize:    blockSize,
+		experiment:   experiment,
+		rnd:          rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
+	}
+}
+
 func (x *requestPieceCarrier) start(ownOdd bool) {
+	x.ownOdd = ownOdd
 	own := make([]byte, totalPieces/8)
 	for i := range totalPieces {
 		if (i%2 == 1) == ownOdd {
@@ -149,33 +240,126 @@ func (x *requestPieceCarrier) message(id byte, p []byte) error {
 }
 
 func (x *requestPieceCarrier) nextRequest() [17]byte {
-	idx := x.next
-	for x.pending[idx] {
-		idx = (idx + 2) % totalPieces
+	x.stateMu.Lock()
+	defer x.stateMu.Unlock()
+	idx := x.nextIndex()
+	begin, length := uint32(0), x.wireBlockSize()
+	if x.experiment&variedRequestFeature != 0 {
+		begin, length = x.randomBlock()
+		x.outBegin[idx] = begin
+		x.outLen[idx] = length
 	}
-	x.next = (idx + 2) % totalPieces
 	x.pending[idx] = true
 	var b [17]byte
 	binary.BigEndian.PutUint32(b[:], 13)
 	b[4] = 6
 	binary.BigEndian.PutUint32(b[5:], idx)
-	binary.BigEndian.PutUint32(b[13:], uint32(x.wireBlockSize()))
+	binary.BigEndian.PutUint32(b[9:], begin)
+	binary.BigEndian.PutUint32(b[13:], uint32(length))
 	return b
 }
 
-func (x *requestPieceCarrier) queueReplacement() bool {
+func (x *requestPieceCarrier) nextIndex() uint32 {
+	if x.experiment&variedRequestFeature != 0 {
+		half := totalPieces / 2
+		x.rndMu.Lock()
+		start := uint32(x.rnd.IntN(half)) * 2
+		if !x.ownOdd {
+			start++
+		}
+		x.rndMu.Unlock()
+		idx := start
+		for x.pending[idx] {
+			idx = (idx + 2) % totalPieces
+			if idx == start {
+				break
+			}
+		}
+		return idx
+	}
+	idx := x.next
+	for x.pending[idx] {
+		idx = (idx + 2) % totalPieces
+	}
+	x.next = (idx + 2) % totalPieces
+	return idx
+}
+
+func (x *requestPieceCarrier) randomBlock() (uint32, int) {
+	x.rndMu.Lock()
+	defer x.rndMu.Unlock()
+	maxBlock := x.maxBlockSize()
+	minBlock := compactBlockSize
+	if minBlock > maxBlock {
+		minBlock = maxBlock
+	}
+	length := minBlock + x.rnd.IntN(maxBlock-minBlock+1)
+	maxBegin := maxBlock - length
+	begin := 0
+	if maxBegin > 0 {
+		begin = x.rnd.IntN(maxBegin + 1)
+		if begin == 0 && x.rnd.IntN(4) != 0 {
+			begin = x.rnd.IntN(maxBegin) + 1
+		}
+	}
+	return uint32(begin), length
+}
+
+func (x *requestPieceCarrier) issueCredit() bool {
 	b := x.nextRequest()
 	select {
 	case x.replacements <- b:
 		return true
 	case <-x.done:
 		return false
-	default:
-		// At most a receive window of issued requests can be replaced before
-		// the peer sees any new credits. More means it sent unsolicited data.
-		x.invalid.Add(1)
-		return false
 	}
+}
+
+func (x *requestPieceCarrier) queueReplacement() bool {
+	return x.issueCredit()
+}
+
+func (x *requestPieceCarrier) replenish(full bool) bool {
+	x.stateMu.Lock()
+	if x.experiment&windowRequestFeature != 0 && x.curWindow < x.window {
+		if full {
+			x.fastCount++
+			if x.fastCount >= x.curWindow {
+				newWindow := x.curWindow * 2
+				if newWindow > x.window {
+					newWindow = x.window
+				}
+				x.curWindow = newWindow
+				x.fastCount = 0
+				x.stateMu.Unlock()
+				return x.topUp()
+			}
+		} else {
+			x.fastCount = 0
+		}
+	}
+	x.stateMu.Unlock()
+	return x.issueCredit()
+}
+
+func (x *requestPieceCarrier) topUp() bool {
+	for {
+		x.stateMu.Lock()
+		needed := x.curWindow - len(x.pending)
+		x.stateMu.Unlock()
+		if needed <= 0 {
+			return true
+		}
+		if !x.issueCredit() {
+			return false
+		}
+	}
+}
+
+func (x *requestPieceCarrier) resetEpoch() {
+	x.stateMu.Lock()
+	x.fastCount = 0
+	x.stateMu.Unlock()
 }
 
 func (x *requestPieceCarrier) writeReplacements() {
@@ -221,7 +405,7 @@ func (x *requestPieceCarrier) readLoop() {
 		length := binary.BigEndian.Uint32(h)
 		reader.Discard(4)
 		if length == 0 {
-			continue // keepalive
+			continue
 		}
 		if length > 1+totalPieces/8 {
 			x.invalid.Add(1)
@@ -249,10 +433,33 @@ func (x *requestPieceCarrier) readLoop() {
 				return
 			}
 			idx := binary.BigEndian.Uint32(b[1:])
-			// Opposite parity to our requested blocks is our advertised half.
-			if idx >= totalPieces || idx%2 == x.next%2 || binary.BigEndian.Uint32(b[5:]) != 0 || binary.BigEndian.Uint32(b[9:]) != uint32(blockSize) {
+			off := binary.BigEndian.Uint32(b[5:])
+			reqLen := binary.BigEndian.Uint32(b[9:])
+			if idx >= totalPieces || idx%2 == x.next%2 {
 				x.invalid.Add(1)
 				return
+			}
+			if x.experiment&variedRequestFeature != 0 {
+				// reqLen == 2 leaves zero payload bytes, making the request
+				// unanswerable; off+reqLen must not wrap past maxBlockSize.
+				if reqLen < 3 || reqLen > uint32(x.maxBlockSize()) || off > uint32(x.maxBlockSize())-reqLen {
+					x.invalid.Add(1)
+					return
+				}
+				x.stateMu.Lock()
+				if _, exists := x.inBegin[idx]; exists {
+					x.stateMu.Unlock()
+					x.invalid.Add(1)
+					return
+				}
+				x.inBegin[idx] = off
+				x.inLen[idx] = int(reqLen)
+				x.stateMu.Unlock()
+			} else {
+				if off != 0 || reqLen != uint32(blockSize) {
+					x.invalid.Add(1)
+					return
+				}
 			}
 			select {
 			case x.requests <- request(idx):
@@ -263,21 +470,48 @@ func (x *requestPieceCarrier) readLoop() {
 				return
 			}
 		case 7:
-			if len(b) != 9+blockSize {
+			if len(b) < 11 {
 				x.invalid.Add(1)
 				return
 			}
 			idx := binary.BigEndian.Uint32(b[1:])
 			off := binary.BigEndian.Uint32(b[5:])
-			if !x.pending[idx] || off != 0 {
+			lengthField := binary.BigEndian.Uint16(b[9:])
+			continued := lengthField&pieceContinuation != 0
+			size := int(lengthField &^ pieceContinuation)
+			blockLen := len(b) - 9
+			x.stateMu.Lock()
+			if !x.pending[idx] {
+				x.stateMu.Unlock()
 				x.invalid.Add(1)
 				return
 			}
+			wantBegin := uint32(0)
+			wantLen := blockSize
+			if x.experiment&variedRequestFeature != 0 {
+				beginOK := false
+				lenOK := false
+				wantBegin, beginOK = x.outBegin[idx]
+				wantLen, lenOK = x.outLen[idx]
+				if !beginOK || !lenOK {
+					x.stateMu.Unlock()
+					x.invalid.Add(1)
+					return
+				}
+			}
+			if off != wantBegin || blockLen != wantLen {
+				x.stateMu.Unlock()
+				x.invalid.Add(1)
+				return
+			}
+			full := len(x.pending) == x.curWindow
 			delete(x.pending, idx)
-			length := binary.BigEndian.Uint16(b[9:11])
-			continued := length&pieceContinuation != 0
-			size := int(length &^ pieceContinuation)
-			if size == 0 || size > blockSize-2 || (continued && (blockSize != compactBlockSize || size != blockSize-2 || partial != nil)) || len(partial)+size > BlockSize-2 {
+			if x.experiment&variedRequestFeature != 0 {
+				delete(x.outBegin, idx)
+				delete(x.outLen, idx)
+			}
+			x.stateMu.Unlock()
+			if size == 0 || size > wantLen-2 || (continued && size != wantLen-2) || len(partial)+size > BlockSize-2 {
 				x.invalid.Add(1)
 				return
 			}
@@ -294,8 +528,15 @@ func (x *requestPieceCarrier) readLoop() {
 					return
 				}
 			}
-			if !x.queueReplacement() {
-				return
+			if full {
+				if !x.replenish(true) {
+					return
+				}
+			} else {
+				x.resetEpoch()
+				if !x.issueCredit() {
+					return
+				}
 			}
 		default:
 			x.invalid.Add(1)
@@ -304,8 +545,8 @@ func (x *requestPieceCarrier) readLoop() {
 		reader.Discard(n)
 		if bitfield && unchoked && !primed {
 			primed = true
-			for range x.window {
-				if !x.queueReplacement() {
+			for range x.curWindow {
+				if !x.issueCredit() {
 					return
 				}
 			}
@@ -320,6 +561,13 @@ func (x *requestPieceCarrier) wireBlockSize() int {
 	return x.blockSize
 }
 
+func (x *requestPieceCarrier) maxBlockSize() int {
+	if x.experiment&variedRequestFeature != 0 {
+		return BlockSize
+	}
+	return x.wireBlockSize()
+}
+
 func (x *requestPieceCarrier) Send(p []byte) error {
 	if len(p) == 0 || len(p) > BlockSize-2 {
 		return fmt.Errorf("invalid AWG datagram size: %d", len(p))
@@ -330,7 +578,6 @@ func (x *requestPieceCarrier) Send(p []byte) error {
 }
 
 func (x *requestPieceCarrier) sendDatagram(p []byte) error {
-	block := x.wireBlockSize()
 	for len(p) > 0 {
 		var r request
 		select {
@@ -338,10 +585,32 @@ func (x *requestPieceCarrier) sendDatagram(p []byte) error {
 		case <-x.done:
 			return net.ErrClosed
 		}
-		n := min(len(p), block-2)
+		idx := uint32(r)
+		begin := uint32(0)
+		maxPayload := x.wireBlockSize() - 2
+		if x.experiment&variedRequestFeature != 0 {
+			x.stateMu.Lock()
+			begin = x.inBegin[idx]
+			if l, ok := x.inLen[idx]; ok {
+				maxPayload = l - 2
+			}
+			delete(x.inBegin, idx)
+			delete(x.inLen, idx)
+			x.stateMu.Unlock()
+		}
+		n := min(len(p), maxPayload)
+		continued := n < len(p)
 		x.writeMu.Lock()
-		b := x.pieceFrame[:13+block]
-		framePiece(b, r, p[:n], n < len(p))
+		var b []byte
+		if x.experiment&variedRequestFeature != 0 {
+			reqLen := maxPayload + 2
+			b = make([]byte, 13+reqLen)
+			frameVariedPiece(b, idx, begin, p[:n], continued, reqLen)
+		} else {
+			block := x.wireBlockSize()
+			b = x.pieceFrame[:13+block]
+			framePiece(b, r, p[:n], continued)
+		}
 		err := fullWrite(x.c, b)
 		x.writeMu.Unlock()
 		if err != nil {
@@ -362,6 +631,14 @@ func (x *requestPieceCarrier) SendBatch(packets [][]byte) error {
 	}
 	x.sendMu.Lock()
 	defer x.sendMu.Unlock()
+	if x.experiment&variedRequestFeature != 0 {
+		for _, p := range packets {
+			if err := x.sendDatagram(p); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	block := x.wireBlockSize()
 	frameSize := 13 + block
 	const chunk = 32
@@ -417,7 +694,23 @@ func framePiece(b []byte, r request, p []byte, continued bool) {
 	}
 	binary.BigEndian.PutUint16(b[13:], length)
 	copy(b[15:], p)
-	rand.Read(b[15+len(p):])
+	crand.Read(b[15+len(p):])
+}
+
+func frameVariedPiece(b []byte, idx, begin uint32, p []byte, continued bool, reqLen int) {
+	binary.BigEndian.PutUint32(b, uint32(len(b)-4))
+	b[4] = 7
+	binary.BigEndian.PutUint32(b[5:], idx)
+	binary.BigEndian.PutUint32(b[9:], begin)
+	length := uint16(len(p))
+	if continued {
+		length |= pieceContinuation
+	}
+	binary.BigEndian.PutUint16(b[13:], length)
+	copy(b[15:], p)
+	if pad := reqLen - (len(p) + 2); pad > 0 {
+		crand.Read(b[15+len(p) : 15+len(p)+pad])
+	}
 }
 
 // Invalid reports how many malformed wire messages were rejected.

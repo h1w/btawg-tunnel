@@ -373,6 +373,28 @@ AWG/WG use their explicit UDP endpoints. No mode silently falls back to
 another. The panel exposes one `btawg://` import and native config
 downloads for the same registered user.
 
+**Server settings → Advanced AWG 3.1 settings** applies to AWG over
+BitTorrent and native AWG, not WireGuard or TLS. New hubs provision a random
+header protection key, enable random trailers, and retain `Jc=4`,
+`Jmin=40`, `Jmax=100`, and `S1`–`S4=32`. Junk sizes are sampled independently;
+two packets can have the same size. Existing deployments keep their profile
+on upgrade. **Save AWG 3.1 preset** writes these settings as pending, retaining
+the existing header key if present. `H1`–`H4` accept non-overlapping ranges or single values.
+The header protection key is a deployment-wide secret shared by AWG peers;
+the settings page never returns it. Leaving the key field blank keeps it;
+use the clear checkbox to remove it. Imports and native exports contain the
+key when configured and must be handled as secrets.
+
+Upgrade the hub and AWG clients before enabling new wire settings. Save the
+pending profile, restart the hub, and retrieve fresh imports or native AWG
+configs from the active profile. Standalone native clients need an AWG engine
+and tooling that support the selected options. Leave cookie protection
+enabled unless you explicitly accept losing the handshake flood protections.
+
+Carrier handshakes no longer include the product name: the hub uses a random
+peer ID per process and the extended-message name is derived from the public
+infohash. This removes literal identifiers, not protocol fingerprinting.
+
 Ports: the carrier listens on **6881** (the canonical BitTorrent port,
 override with `-carrier-port`), and every DHT socket in the system — hub
 announcer and client discovery — binds the first free port of the standard
@@ -380,11 +402,26 @@ torrent client range **6881–6889**, falling back to an ephemeral port only if
 the whole range is busy. A server + client on one machine coexist in the
 range, exactly like two torrent clients would.
 
-Upgrade hub and client together for the faster `req-tcp` and `req-utp` paths.
-New peers negotiate a larger request window and 1536-byte blocks, fragmenting
-only datagrams that do not fit. Old peers keep the 2048-byte block and 32-request
-window and still stop at the original index limit. The import string and TUN
-routes do not change if the selected transport stays the same.
+Updating both binaries enables the new hub AWG carriers automatically, with
+the same SOCKS5 ports, IP routes and enabled modes:
+
+- `ext-tcp` / `ext-utp`: mutually authenticated TLS-protected, packed and
+  variably padded AWG records when the saved import already has a TLS hub pin.
+- `req-tcp` / `req-utp`: variable blocks and an adaptive window starting at
+  32 requests.
+
+During a rolling upgrade, pairs that do not both advertise the new format
+keep the previous framing. An old import without a TLS hub pin also keeps
+the previous `ext` framing until refreshed. If protected `ext` is selected,
+TLS authentication failure closes the connection without retrying in the
+previous framing. The existing AWG profile still applies, including any
+stored keys. Native modes, direct peer paths and TLS-only payload modes are
+unchanged. Carrier pacing and idle keepalives remain off by default.
+
+No environment variables are required. An existing `BTAWG_EXT_EXPERIMENT`
+or `BTAWG_REQ_EXPERIMENT` override takes precedence. For comparison or
+rollback, set the relevant variable to `baseline`; remove any overrides and
+restart both services to restore automatic negotiation.
 
 For a lossy WAN, set `BTAWG_UTP_PACE_MBPS` independently on each host to
 cap that process's outgoing µTP bulk data (50–10000 Mbit/s; unset or `0`

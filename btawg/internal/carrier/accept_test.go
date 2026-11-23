@@ -3,6 +3,8 @@ package carrier
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -37,6 +39,53 @@ func TestAcceptDispatchExtended(t *testing.T) {
 	}
 
 	roundTrip(t, cli, r.tr)
+}
+
+func TestExtendedHandshakeAdvertisesNoProductName(t *testing.T) {
+	for _, dialer := range []bool{true, false} {
+		client, peer := tcpPair(t)
+		if err := peer.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		ready := make(chan result, 1)
+		go func() {
+			if dialer {
+				tr, pid, err := NewExtended(client, testHash, peerA)
+				ready <- result{tr: tr, pid: pid, err: err}
+				return
+			}
+			tr, pid, _, err := Accept(client, peerA, map[[20]byte]string{testHash: "ext"})
+			ready <- result{tr: tr, pid: pid, err: err}
+		}()
+		if _, err := Handshake(peer, testHash, peerB); err != nil {
+			t.Fatal(err)
+		}
+		var length [4]byte
+		if _, err := io.ReadFull(peer, length[:]); err != nil {
+			t.Fatal(err)
+		}
+		n := binary.BigEndian.Uint32(length[:])
+		if n < 2 || n > 128 {
+			t.Fatalf("invalid extension handshake length %d", n)
+		}
+		body := make([]byte, n)
+		if _, err := io.ReadFull(peer, body); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := peer.Write([]byte("\x00\x00\x00\x12\x14\x00d1:md5:btawgi1ee")); err != nil {
+			t.Fatal(err)
+		}
+		r := <-ready
+		if r.err != nil {
+			t.Fatalf("legacy peer handshake: %v", r.err)
+		}
+		t.Cleanup(r.tr.Wait)
+		// Legacy peers keep ID 1; the outbound handshake uses the opaque
+		// infohash-derived name and correct bencode (closing both dicts).
+		if bytes.Contains(body, []byte("btawg")) || body[0] != 20 || body[1] != 0 || !bytes.HasSuffix(body, []byte("eee")) {
+			t.Fatalf("unexpected extension advertisement: %q", body)
+		}
+	}
 }
 
 func TestAcceptDispatchRequestPiece(t *testing.T) {

@@ -117,7 +117,7 @@ func TestClientFullFlow(t *testing.T) {
 		ServerIP:      "10.77.0.1",
 		Transport:     "ext-utp",
 		SocksPort:     0,
-		Profile:       config.DefaultProfile(),
+		Profile:       srv.Config().AWGProfile,
 		DHTBootstrap:  []string{relay},
 	}
 	c, err := New(ccfg)

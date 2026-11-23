@@ -81,6 +81,14 @@ func CanonicalMode(mode string) string {
 		return ModeReqUTP
 	case "req-tcp":
 		return ModeReqTCP
+	case "tls-ext-utp":
+		return ModeTLSExtUTP
+	case "tls-ext-tcp":
+		return ModeTLSExtTCP
+	case "tls-req-utp":
+		return ModeTLSReqUTP
+	case "tls-req-tcp":
+		return ModeTLSReqTCP
 	case "awg":
 		return ModeAWG
 	case "wg":
@@ -125,36 +133,6 @@ func ValidClientMode(mode string) bool { return IsCarrierMode(mode) || IsNativeM
 // CarrierHelloModes returns one representative per discovery hash.
 func CarrierHelloModes() [4]string {
 	return [4]string{ModeExtTCP, ModeReqTCP, ModeTLSExtTCP, ModeTLSReqTCP}
-}
-
-// AWGProfile holds the AmneziaWG obfuscation parameters shared by the server
-// hub and every client.
-type AWGProfile struct {
-	JC   int `json:"jc"`
-	JMin int `json:"jmin"`
-	JMax int `json:"jmax"`
-	S1   int `json:"s1"`
-	S2   int `json:"s2"`
-	S3   int `json:"s3"`
-	S4   int `json:"s4"`
-	H1   int `json:"h1"`
-	H2   int `json:"h2"`
-	H3   int `json:"h3"`
-	H4   int `json:"h4"`
-}
-
-// DefaultProfile returns the validated transport profile: extended (BEP 10)
-// over µTP no-Nagle was benchmarked at +0.07 ms p95 versus bare AWG with this
-// exact AmneziaWG parameter set.
-func DefaultProfile() AWGProfile {
-	return AWGProfile{JC: 4, JMin: 40, JMax: 100, S1: 32, S2: 32, S3: 32, S4: 32, H1: 101, H2: 102, H3: 103, H4: 104}
-}
-
-// String renders the profile in the line-oriented name=value form consumed by
-// the AmneziaWG engine's IpcSet.
-func (p AWGProfile) String() string {
-	return fmt.Sprintf("jc=%d\njmin=%d\njmax=%d\ns1=%d\ns2=%d\ns3=%d\ns4=%d\nh1=%d\nh2=%d\nh3=%d\nh4=%d\n",
-		p.JC, p.JMin, p.JMax, p.S1, p.S2, p.S3, p.S4, p.H1, p.H2, p.H3, p.H4)
 }
 
 // ClientConfig is the full client bootstrap state carried in the import string
@@ -207,6 +185,9 @@ func ParseImportString(s string) (ClientConfig, error) {
 	if c.Version != ClientVersion {
 		return c, fmt.Errorf("unsupported import string version %d (want %d)", c.Version, ClientVersion)
 	}
+	if c.Profile == (AWGProfile{}) {
+		c.Profile = DefaultProfile()
+	}
 	return c, nil
 }
 
@@ -253,16 +234,20 @@ func (c ClientConfig) NativeConfig(mode string) (string, error) {
 	fmt.Fprintf(&b, "Address = %s/%d\n", c.ClientIP, subnet.Bits())
 	fmt.Fprintf(&b, "MTU = %d\n", DefaultMTU)
 	if mode == ModeAWG {
-		p := c.Profile
-		fmt.Fprintf(&b, "Jc = %d\nJmin = %d\nJmax = %d\n", p.JC, p.JMin, p.JMax)
-		fmt.Fprintf(&b, "S1 = %d\nS2 = %d\nS3 = %d\nS4 = %d\n", p.S1, p.S2, p.S3, p.S4)
-		fmt.Fprintf(&b, "H1 = %d\nH2 = %d\nH3 = %d\nH4 = %d\n", p.H1, p.H2, p.H3, p.H4)
+		if err := c.Profile.Validate(); err != nil {
+			return "", err
+		}
+		c.Profile.writeDevice(&b, true)
 	}
 	b.WriteString("\n[Peer]\n")
 	fmt.Fprintf(&b, "PublicKey = %s\n", pubB64)
 	fmt.Fprintf(&b, "AllowedIPs = %s\n", strings.Join(routes, ", "))
 	fmt.Fprintf(&b, "Endpoint = %s\n", endpoint)
-	fmt.Fprintf(&b, "PersistentKeepalive = 25\n")
+	keepalive := "25"
+	if mode == ModeAWG && c.Profile.PersistentKeepalive != "" {
+		keepalive = string(c.Profile.PersistentKeepalive)
+	}
+	fmt.Fprintf(&b, "PersistentKeepalive = %s\n", keepalive)
 	return b.String(), nil
 }
 
@@ -288,7 +273,10 @@ func (c ClientConfig) NativeDeviceConfig(mode string) (string, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "private_key=%s\n", c.ClientPrivKey)
 	if mode == ModeAWG {
-		b.WriteString(c.Profile.String())
+		if err := c.Profile.Validate(); err != nil {
+			return "", err
+		}
+		b.WriteString(c.Profile.DeviceIPC())
 	}
 	b.WriteString("replace_peers=true\n")
 	fmt.Fprintf(&b, "public_key=%s\n", c.ServerPubKey)
@@ -296,7 +284,11 @@ func (c ClientConfig) NativeDeviceConfig(mode string) (string, error) {
 	// overlay replies, internet unicast traffic, and user-managed routes.
 	b.WriteString("allowed_ip=0.0.0.0/0\n")
 	fmt.Fprintf(&b, "endpoint=%s\n", endpoint)
-	b.WriteString("persistent_keepalive_interval=25\n")
+	keepalive := "25"
+	if mode == ModeAWG && c.Profile.PersistentKeepalive != "" {
+		keepalive = string(c.Profile.PersistentKeepalive)
+	}
+	fmt.Fprintf(&b, "persistent_keepalive_interval=%s\n", keepalive)
 	return b.String(), nil
 }
 

@@ -92,6 +92,7 @@ func (p *Panel) Handler() http.Handler {
 	mux.HandleFunc("GET /api/traffic", p.auth(p.liveStats))
 	mux.HandleFunc("GET /server", p.auth(p.serverPage))
 	mux.HandleFunc("POST /server", p.auth(p.serverSubmit))
+	mux.HandleFunc("POST /server/awg31-preset", p.auth(p.serverAWG31Preset))
 	mux.HandleFunc("GET /clients", p.auth(p.clientsPage))
 	mux.HandleFunc("POST /clients/create", p.auth(p.clientCreate))
 	mux.HandleFunc("POST /clients/revoke", p.auth(p.clientRevoke))
@@ -236,14 +237,21 @@ func (p *Panel) serverPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pending.Normalize()
+	active := p.reg.Config()
+	profileChanged := pending.AWGProfile != active.AWGProfile
+	keyConfigured := pending.AWGProfile.HeaderProtectionKey != ""
+	pending.AWGProfile.HeaderProtectionKey = ""
+	active.AWGProfile.HeaderProtectionKey = ""
 	p.render(w, "server", map[string]any{
-		"CSRF":      p.session(r).csrf,
-		"Cfg":       pending,
-		"ActiveCfg": p.reg.Config(),
-		"Managed":   p.reg.Managed(),
-		"Modes":     config.ClientModes(),
-		"Saved":     r.URL.Query().Get("saved") == "1",
-		"Active":    "server",
+		"CSRF":              p.session(r).csrf,
+		"Cfg":               pending,
+		"ActiveCfg":         active,
+		"AWGProfileChanged": profileChanged,
+		"AWGKeyConfigured":  keyConfigured,
+		"Managed":           p.reg.Managed(),
+		"Modes":             config.ClientModes(),
+		"Saved":             r.URL.Query().Get("saved") == "1",
+		"Active":            "server",
 	})
 }
 
@@ -258,11 +266,49 @@ func (p *Panel) serverSubmit(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(r.PostFormValue(name), "%d", &v)
 		return v
 	}
-	cfg.AWGProfile = config.AWGProfile{
-		JC: get("jc"), JMin: get("jmin"), JMax: get("jmax"),
-		S1: get("s1"), S2: get("s2"), S3: get("s3"), S4: get("s4"),
-		H1: get("h1"), H2: get("h2"), H3: get("h3"), H4: get("h4"),
+	value := func(field string) string { return strings.TrimSpace(r.PostFormValue(field)) }
+	rangeValue := func(field string) config.AWGRange { return config.AWGRange(value(field)) }
+	checked := func(field string) bool { return value(field) == "1" }
+	profile := config.AWGProfile{
+		H1: rangeValue("h1"), H2: rangeValue("h2"), H3: rangeValue("h3"), H4: rangeValue("h4"),
+		I1: value("i1"), I2: value("i2"), I3: value("i3"), I4: value("i4"), I5: value("i5"),
+		HeaderProtectionKey:    cfg.AWGProfile.HeaderProtectionKey,
+		ContentPaddingAddition: rangeValue("content_padding_addition"),
+		RekeyAfterTime:         rangeValue("rekey_after_time"), RekeyTimeout: rangeValue("rekey_timeout"),
+		RejectAfterTime: rangeValue("reject_after_time"), KeepaliveTimeout: rangeValue("keepalive_timeout"),
+		MaxHandshakeAttempts: rangeValue("max_handshake_attempts"), PersistentKeepalive: rangeValue("persistent_keepalive"),
+		RandomTrailers: checked("random_trailers"), DisableCookies: checked("disable_cookies"),
 	}
+	for name, dst := range map[string]*int{
+		"jc": &profile.JC, "jmin": &profile.JMin, "jmax": &profile.JMax,
+		"s1": &profile.S1, "s2": &profile.S2, "s3": &profile.S3, "s4": &profile.S4,
+	} {
+		n, err := strconv.ParseUint(value(name), 10, 16)
+		if err != nil {
+			http.Error(w, "invalid AWG setting: "+name, http.StatusBadRequest)
+			return
+		}
+		*dst = int(n)
+	}
+	key := value("header_protection_key")
+	if checked("clear_header_protection_key") {
+		if key != "" {
+			http.Error(w, "choose either replacing or clearing the header protection key", http.StatusBadRequest)
+			return
+		}
+		profile.HeaderProtectionKey = ""
+	} else if key != "" {
+		profile.HeaderProtectionKey = strings.ToLower(key)
+	}
+	if profile.H1 == "" || profile.H2 == "" || profile.H3 == "" || profile.H4 == "" {
+		http.Error(w, "H1–H4 are required", http.StatusBadRequest)
+		return
+	}
+	if err := profile.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	cfg.AWGProfile = profile
 	cfg.Transport = config.CanonicalMode(r.PostFormValue("transport"))
 	if cfg.LegacyTransport == "" {
 		cfg.LegacyTransport = p.reg.Config().LegacyTransport
@@ -301,6 +347,19 @@ func (p *Panel) serverSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := p.st.SaveServerConfig(cfg); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/server?saved=1", http.StatusFound)
+}
+
+func (p *Panel) serverAWG31Preset(w http.ResponseWriter, r *http.Request) {
+	cfg, err := p.st.LoadServerConfig()
+	if err == nil {
+		cfg.AWGProfile = config.AWG31Profile(cfg.AWGProfile.HeaderProtectionKey)
+		err = p.st.SaveServerConfig(cfg)
+	}
+	if err != nil {
+		http.Error(w, "could not save AWG 3.1 preset", http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/server?saved=1", http.StatusFound)

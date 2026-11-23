@@ -35,15 +35,12 @@ import (
 	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
-// serverPeerID is the fixed BitTorrent peer ID this hub presents in every
-// carrier handshake; clients identify the deployment by infohash, not peer ID.
-var serverPeerID = [20]byte{'b', 't', 'a', 'w', 'g', '-', 's', 'e', 'r', 'v', 'e', 'r', '-', 'n', 'o', 'd', 'e', '0', '0', '1'}
-
 // Server is the assembled btawg hub.
 type Server struct {
 	cfg         config.ServerConfig
 	st          *store.Store
 	infoHash    [20]byte
+	peerID      [20]byte
 	pubKey      string
 	tlsIdentity *iptunnel.Identity
 
@@ -175,6 +172,12 @@ func prepareServer(cfg config.ServerConfig, st *store.Store) (*Server, error) {
 		}
 	}
 	cfg.Normalize()
+	if stored.InfoHash == "" && stored.ServerPrivKey == "" && cfg.InfoHash == "" && cfg.ServerPrivKey == "" && cfg.AWGProfile == config.DefaultProfile() {
+		cfg.AWGProfile = config.AWG31Profile("")
+	}
+	if err := cfg.AWGProfile.Validate(); err != nil {
+		return nil, fmt.Errorf("AWG profile: %w", err)
+	}
 	if !config.ValidClientMode(cfg.Transport) {
 		return nil, fmt.Errorf("unsupported transport %q", cfg.Transport)
 	}
@@ -258,6 +261,7 @@ func prepareServer(cfg config.ServerConfig, st *store.Store) (*Server, error) {
 		attached:     make(map[string]int),
 		closed:       make(chan struct{}),
 	}
+	rand.Read(s.peerID[:])
 
 	s.policy = newPolicySnapshot()
 	s.savedTraffic, err = st.LoadTraffic()
@@ -284,17 +288,18 @@ func (s *Server) finish() error {
 	// socket is allocated per carrier mode.
 	s.dev = device.NewDevice(s.router.awg, bind.NewHybrid(), device.NewLogger(device.LogLevelError, "btawg-awg: "))
 	s.wg = device.NewDevice(s.router.wg, conn.NewDefaultBind(), device.NewLogger(device.LogLevelError, "btawg-wg: "))
+	awgProfile := s.cfg.AWGProfile.DeviceIPC()
 	for _, mode := range []string{config.ModeExtUTP, config.ModeExtTCP, config.ModeReqUTP, config.ModeReqTCP} {
 		eng := s.router.engineForMode(mode)
 		b := bind.New()
 		d := device.NewDevice(eng, b, device.NewLogger(device.LogLevelError, "btawg-"+mode+": "))
-		if err := d.IpcSet(fmt.Sprintf("private_key=%s\nlisten_port=%d\n%s", s.cfg.ServerPrivKey, s.cfg.AWGPort, s.cfg.AWGProfile.String())); err != nil {
+		if err := d.IpcSet(fmt.Sprintf("private_key=%s\nlisten_port=%d\n%s", s.cfg.ServerPrivKey, s.cfg.AWGPort, awgProfile)); err != nil {
 			return fmt.Errorf("configure %s device: %w", mode, err)
 		}
 		s.modeDevs[mode] = d
 		s.modeBinds[mode] = b
 	}
-	if err := s.dev.IpcSet(fmt.Sprintf("private_key=%s\nlisten_port=%d\n%s", s.cfg.ServerPrivKey, s.cfg.AWGPort, s.cfg.AWGProfile.String())); err != nil {
+	if err := s.dev.IpcSet(fmt.Sprintf("private_key=%s\nlisten_port=%d\n%s", s.cfg.ServerPrivKey, s.cfg.AWGPort, awgProfile)); err != nil {
 		return err
 	}
 	if err := s.wg.IpcSet(fmt.Sprintf("private_key=%s\nlisten_port=%d\n", s.cfg.ServerPrivKey, s.cfg.WGPort)); err != nil {
@@ -572,11 +577,12 @@ func (s *Server) acceptConn(ctx context.Context, c net.Conn, proto string) {
 	if err := c.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
 		return
 	}
-	t, theirs, family, err := carrier.Accept(c, serverPeerID, s.hashes)
+	t, theirs, family, err := carrier.AcceptHub(c, s.peerID, s.hashes)
 	if err != nil {
 		return
 	}
 	defer t.Wait()
+	base := t
 	id := hex.EncodeToString(theirs[:])
 	s.mu.Lock()
 	rec, ok := s.byPeerID[id]
@@ -589,7 +595,8 @@ func (s *Server) acceptConn(ctx context.Context, c net.Conn, proto string) {
 		return
 	}
 	var secure *tls.Conn
-	if strings.HasSuffix(family, "-tls") {
+	recordMode := carrier.ExtendedExperiment(t)
+	if strings.HasSuffix(family, "-tls") || recordMode != "" {
 		pin, err := iptunnel.PublicKey(rec.PrivKey, iptunnel.Client)
 		if err != nil {
 			return
@@ -602,9 +609,26 @@ func (s *Server) acceptConn(ctx context.Context, c net.Conn, proto string) {
 		if err := secure.HandshakeContext(ctx); err != nil {
 			return
 		}
+		if recordMode != "" {
+			records, err := iptunnel.SecureDatagramRecords(secure, base, recordMode)
+			if err != nil {
+				return
+			}
+			defer records.Wait()
+			t = records
+			secure = nil // AWG still owns the IP layer.
+		}
 	}
 	if err := c.SetDeadline(time.Time{}); err != nil {
 		return
+	}
+	if secure == nil {
+		timed, err := carrier.WithTiming(t, base)
+		if err != nil {
+			return
+		}
+		defer timed.Wait()
+		t = timed
 	}
 	ip := netip.MustParseAddr(rec.IP)
 	s.applyMu.Lock()

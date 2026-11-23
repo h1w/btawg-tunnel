@@ -90,8 +90,8 @@ const liveTableTmpl = `{{define "live-table"}}
 
 const serverTmpl = `{{define "content"}}
 <h1>Server settings</h1>
-{{if .Saved}}<div class="tag ok">saved — restart required for transport/port/IP changes; re-import required for AWG profile changes</div>{{end}}
-<div class="note">Pending settings are shown in the form. The running hub uses the active settings on the right. Transport, carrier/native ports and ExternalIP need a restart; AWG profile changes need clients to re-import.</div>
+{{if .Saved}}<div class="tag ok">Saved. Restart the hub to apply pending settings; re-import affected AWG clients after restart.</div>{{end}}
+<div class="note">The form shows pending settings. Restart the hub to apply changes. AWG imports and exports use the active profile.</div>
 <form method="post" action="/server">
 <input type="hidden" name="csrf" value="{{.CSRF}}">
 <div class="card"><h2>AWG profile (BitTorrent + native AWG)</h2>
@@ -108,7 +108,33 @@ const serverTmpl = `{{define "content"}}
 <label>h3<input name="h3" value="{{.Cfg.AWGProfile.H3}}"></label>
 <label>h4<input name="h4" value="{{.Cfg.AWGProfile.H4}}"></label>
 </div>
-{{if ne .Cfg.AWGProfile.String .ActiveCfg.AWGProfile.String}}<div class="note">Profile differs from active config — clients must re-import.</div>{{end}}
+<details>
+<summary>Advanced AWG 3.1 settings</summary>
+<p class="hint">H1–H4 and the range fields accept a number or a range such as 100–200 (type an ASCII hyphen). Blank optional fields keep engine defaults.</p>
+<div class="grid">
+<label>I1<input name="i1" value="{{.Cfg.AWGProfile.I1}}"></label>
+<label>I2<input name="i2" value="{{.Cfg.AWGProfile.I2}}"></label>
+<label>I3<input name="i3" value="{{.Cfg.AWGProfile.I3}}"></label>
+<label>I4<input name="i4" value="{{.Cfg.AWGProfile.I4}}"></label>
+<label>I5<input name="i5" value="{{.Cfg.AWGProfile.I5}}"></label>
+<label>Header protection key (64 hex digits)<input type="password" name="header_protection_key" autocomplete="new-password" placeholder="{{if .AWGKeyConfigured}}Configured; blank keeps current key{{else}}Not configured{{end}}"></label>
+<label>Content padding addition (bytes)<input name="content_padding_addition" value="{{.Cfg.AWGProfile.ContentPaddingAddition}}"></label>
+<label>Rekey after (seconds)<input name="rekey_after_time" value="{{.Cfg.AWGProfile.RekeyAfterTime}}"></label>
+<label>Rekey timeout (seconds)<input name="rekey_timeout" value="{{.Cfg.AWGProfile.RekeyTimeout}}"></label>
+<label>Reject keys after (seconds)<input name="reject_after_time" value="{{.Cfg.AWGProfile.RejectAfterTime}}"></label>
+<label>Keepalive timeout (seconds)<input name="keepalive_timeout" value="{{.Cfg.AWGProfile.KeepaliveTimeout}}"></label>
+<label>Max handshake attempts<input name="max_handshake_attempts" value="{{.Cfg.AWGProfile.MaxHandshakeAttempts}}"></label>
+<label>Client persistent keepalive (seconds)<input name="persistent_keepalive" value="{{.Cfg.AWGProfile.PersistentKeepalive}}" placeholder="Mode default; 0 disables"></label>
+</div>
+<div class="row">
+<label><input type="checkbox" name="clear_header_protection_key" value="1"> Clear header protection key</label>
+<label><input type="checkbox" name="random_trailers" value="1"{{if .Cfg.AWGProfile.RandomTrailers}} checked{{end}}> Random trailers</label>
+<label><input type="checkbox" name="disable_cookies" value="1"{{if .Cfg.AWGProfile.DisableCookies}} checked{{end}}> Disable cookies and handshake flood protection</label>
+</div>
+<p class="hint">The AWG 3.1 preset resets these AWG fields to deployment defaults and generates a key if none exists. Existing keys are kept. The hub and clients continue using the active profile until restart and re-import.</p>
+<button type="submit" formaction="/server/awg31-preset">Save AWG 3.1 preset</button>
+</details>
+{{if .AWGProfileChanged}}<div class="note">Profile differs from active config — restart the hub, then re-import AWG clients.</div>{{end}}
 </div>
 <div class="card"><h2>Preferred mode &amp; transport</h2>
 <div class="row">

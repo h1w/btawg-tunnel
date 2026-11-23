@@ -109,7 +109,15 @@ func TestServerClientEcho(t *testing.T) {
 		ServerIP:      "10.77.0.1",
 		Transport:     "ext-utp",
 		SocksPort:     1080,
-		Profile:       config.DefaultProfile(),
+		Profile:       srv.Config().AWGProfile,
+	}
+	active := srv.Config().AWGProfile
+	if !active.RandomTrailers || active.DisableCookies || len(active.HeaderProtectionKey) != 64 || active.JC == 0 || active.JMin >= active.JMax || active.S1 != 32 || active.S2 != 32 || active.S3 != 32 || active.S4 != 32 {
+		t.Fatal("fresh hub did not provision the AWG 3.1 profile")
+	}
+	saved, err := st.LoadServerConfig()
+	if err != nil || saved.AWGProfile != active {
+		t.Fatal("fresh profile was not persisted for later imports and restart")
 	}
 	if err := cd.IpcSet(awg.ClientConf(ccfg)); err != nil {
 		t.Fatalf("client IpcSet: %v", err)
@@ -145,9 +153,12 @@ func TestServerClientEcho(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse peer id: %v", err)
 	}
-	tcar, _, err := carrier.NewExtended(conn, infoHash, peerID)
+	tcar, hubID, err := carrier.NewExtended(conn, infoHash, peerID)
 	if err != nil {
 		t.Fatalf("carrier handshake: %v", err)
+	}
+	if hubID == ([20]byte{}) || strings.Contains(string(hubID[:]), "btawg") {
+		t.Fatal("hub peer ID is empty or exposes the product name")
 	}
 	cb.Attach(bind.Endpoint(serverIP), tcar)
 

@@ -187,6 +187,105 @@ func TestServerConfigFormRoundTrip(t *testing.T) {
 	}
 }
 
+func TestServerAWGProfileRejectsInvalidAndKeepsSecret(t *testing.T) {
+	srv, st, reg := newTestPanel(t)
+	c := login(t, srv.URL)
+	const key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	form := map[string][]string{
+		"csrf": {csrfOf(t, c, srv.URL, "/server")},
+		"jc":   {"4"}, "jmin": {"40"}, "jmax": {"100"},
+		"s1": {"32"}, "s2": {"32"}, "s3": {"32"}, "s4": {"32"},
+		"h1": {"1000-1099"}, "h2": {"1100-1199"}, "h3": {"1200-1299"}, "h4": {"1300-1399"},
+		"header_protection_key": {key}, "random_trailers": {"1"}, "i1": {"<r 32>"},
+		"transport": {"ext-tcp"}, "carrier_port": {"6881"}, "awg_port": {"51821"},
+		"wg_port": {"51820"}, "panel_port": {"8080"}, "external_ip": {"203.0.113.7"},
+	}
+	post := func(want int) {
+		t.Helper()
+		resp, err := c.PostForm(srv.URL+"/server", form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != want {
+			t.Fatalf("POST status %d, want %d: %s", resp.StatusCode, want, body)
+		}
+		if strings.Contains(string(body), key) {
+			t.Fatal("settings response disclosed the header protection key")
+		}
+	}
+	post(http.StatusFound)
+	get := func() config.ServerConfig {
+		t.Helper()
+		saved, err := st.LoadServerConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return saved
+	}
+	reg.activeConfig = get()
+	delete(form, "header_protection_key")
+	form["h2"] = []string{"1050-1150"}
+	post(http.StatusBadRequest)
+	form["h2"] = []string{"1100-1199"}
+	post(http.StatusFound)
+	ipc := get().AWGProfile.DeviceIPC()
+	for _, line := range []string{"h1=1000-1099\n", "header_protection_key=" + key + "\n", "random_trailers=1\n", "i1=<r 32>\n"} {
+		if !strings.Contains(ipc, line) {
+			t.Fatal("saved settings did not reach the runtime profile")
+		}
+	}
+	resp, err := c.Get(srv.URL + "/server")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || strings.Contains(string(body), key) || !strings.Contains(string(body), "1000-1099") {
+		t.Fatal("settings page failed to render the range without disclosing the key")
+	}
+}
+
+func TestServerAWG31PresetKeepsKeyAndOtherSettings(t *testing.T) {
+	srv, st, _ := newTestPanel(t)
+	c := login(t, srv.URL)
+	csrf := csrfOf(t, c, srv.URL, "/server")
+	apply := func() config.ServerConfig {
+		t.Helper()
+		resp, err := c.PostForm(srv.URL+"/server/awg31-preset", map[string][]string{"csrf": {csrf}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusFound {
+			t.Fatalf("preset status = %d, want 302", resp.StatusCode)
+		}
+		cfg, err := st.LoadServerConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+	cfg := apply()
+	p := cfg.AWGProfile
+	if !p.RandomTrailers || p.DisableCookies || p.JC != 4 || p.JMin != 40 || p.JMax != 100 || p.S1 != 32 || p.S2 != 32 || p.S3 != 32 || p.S4 != 32 || len(p.HeaderProtectionKey) != 64 {
+		t.Fatal("selected preset was not saved")
+	}
+	if apply().AWGProfile != p {
+		t.Fatal("reapplying the preset changed the shared key")
+	}
+	if cfg.PanelPort != 8080 || cfg.Transport != config.ModeExtUTP {
+		t.Fatal("applying the AWG profile changed unrelated settings")
+	}
+}
+
 func TestCreateClientProducesImportString(t *testing.T) {
 	srv, st, reg := newTestPanel(t)
 	c := login(t, srv.URL)
@@ -641,27 +740,6 @@ func TestUpdateClientPolicyUnknownID(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("post policy unknown id = %d, want 404", resp.StatusCode)
-	}
-}
-
-func TestServerPageShowsApplyBanner(t *testing.T) {
-	srv, _, _ := newTestPanel(t)
-	c := login(t, srv.URL)
-	resp, err := c.Get(srv.URL + "/server")
-	if err != nil {
-		t.Fatalf("get server: %v", err)
-	}
-	defer resp.Body.Close()
-	pageBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read server page: %v", err)
-	}
-	page := string(pageBytes)
-	if !strings.Contains(page, "restart") {
-		t.Fatalf("server page missing 'restart'; page:\n%s", page)
-	}
-	if !strings.Contains(page, "re-import") {
-		t.Fatalf("server page missing 're-import'; page:\n%s", page)
 	}
 }
 

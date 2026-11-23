@@ -41,6 +41,7 @@ func TestManagedBalancerPoolEditsDoNotMoveLiveSessions(t *testing.T) {
 	go hub.Run(t.Context())
 	cfg.ServerPubKey, cfg.WGEndpoint = hub.PubKey(), "127.0.0.1:17818"
 	cfg.AWGEndpoint = "127.0.0.1:17817"
+	cfg.Profile = hub.Config().AWGProfile
 
 	listen := func(addr netip.AddrPort, serve func(net.Conn)) {
 		t.Helper()
