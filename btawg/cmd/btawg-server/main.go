@@ -70,4 +70,7 @@ Legacy flags are accepted on the bare command or on run:
   -no-tun          userspace overlay only
   -tun NAME        TUN interface name (default btawg0)
   -managed         use fixed ports, durable paths and systemd notify
+  -subscription-host HOST  public HTTPS subscription hostname (TCP 2228)
+  -subscription-cert PATH  certificate chain PEM file
+  -subscription-key PATH   private key PEM file
 `

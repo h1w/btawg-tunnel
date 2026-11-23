@@ -44,9 +44,9 @@ func clientSetup(install bool) (*service.Screen, error) {
 	default:
 		previous = &cfg
 	}
-	help := "Paste the btawg:// string from the server panel. The import is hidden."
+	help := "Paste the btawg:// import or HTTPS subscription link from the server panel. The input is hidden."
 	if previous != nil {
-		help = "Leave the import blank to keep it. Saving changes restarts a running service."
+		help = "Leave the VPN import blank to keep it. Saving changes restarts a running service."
 	}
 	help += " Permanent UPnP mappings may remain after a crash."
 	submit := "Save settings"
@@ -87,6 +87,10 @@ func clientSetup(install bool) (*service.Screen, error) {
 				PeerPort: port, PeerEndpoint: fields[9].Value,
 				PeerTCPEndpoint: fields[10].Value,
 			}
+			resolved, err := resolveVPNImport(fields[0].Value, previous)
+			if err != nil {
+				return nil, err
+			}
 			if err := persistClientSettings(func() error {
 				latest, err := client.LoadManagedConfig(client.ManagedConfigPath)
 				if err == nil {
@@ -96,7 +100,7 @@ func clientSetup(install bool) (*service.Screen, error) {
 				} else {
 					previous = nil
 				}
-				return saveClientSettings(previous, fields[0].Value, settings)
+				return saveClientSettings(previous, resolved, settings)
 			}); err != nil {
 				return nil, err
 			}
@@ -116,8 +120,8 @@ func parsePeerPort(raw string) (uint16, error) {
 	return uint16(port), nil
 }
 
-func saveClientSettings(previous *client.ManagedConfig, raw string, settings client.ManagedConfig) error {
-	raw, listen, tun := strings.TrimSpace(raw), strings.TrimSpace(settings.ListenIP), strings.TrimSpace(settings.TUNName)
+func saveClientSettings(previous *client.ManagedConfig, source vpnImport, settings client.ManagedConfig) error {
+	listen, tun := strings.TrimSpace(settings.ListenIP), strings.TrimSpace(settings.TUNName)
 	ip, err := netip.ParseAddr(listen)
 	if err != nil || !ip.Is4() {
 		return errors.New("SOCKS5 listen address must be IPv4")
@@ -131,18 +135,14 @@ func saveClientSettings(previous *client.ManagedConfig, raw string, settings cli
 	if previous != nil {
 		next = *previous
 	}
-	if raw != "" || previous == nil {
-		parsed, err := config.ParseImportString(raw)
-		if err != nil {
-			return errors.New("invalid VPN import: paste the complete btawg:// string from the server panel")
+	if source.profile == "" && previous == nil {
+		return errors.New("VPN import is required")
+	}
+	if source.profile != "" {
+		if previous == nil || (source.url == "" && next.Import != source.profile) {
+			next.Enabled = []string{source.mode}
 		}
-		mode := config.CanonicalMode(parsed.Transport)
-		if !config.ValidClientMode(mode) {
-			return errors.New("VPN import uses an unsupported transport")
-		}
-		if next.Import != raw {
-			next.Import, next.Enabled = raw, []string{mode}
-		}
+		next.Import, next.SubscriptionURL = source.profile, source.url
 	}
 	if previous == nil {
 		next.Credentials, err = client.GenerateCredentials()
@@ -167,7 +167,15 @@ func clientActions(_ string) ([]service.Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(portActions(status, running),
+	actions := portActions(status, running)
+	cfg, err := client.LoadManagedConfig(client.ManagedConfigPath)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.SubscriptionURL != "" {
+		actions = append(actions, service.Action{Label: "Refresh subscription", Run: refreshSubscriptionScreen})
+	}
+	return append(actions,
 		service.Action{Label: "Peer connections", Run: func() (*service.Screen, error) { return peerSettingsScreen(client.RequestControl) }},
 		service.Action{Label: "Show SOCKS5 credentials", Run: func() (*service.Screen, error) { return socksCredentials("show") }},
 		service.Action{Label: "Rotate SOCKS5 credentials", Confirm: "Replace the login and password for all ports? Existing SOCKS5 sessions will close.", Run: func() (*service.Screen, error) { return socksCredentials("rotate") }},

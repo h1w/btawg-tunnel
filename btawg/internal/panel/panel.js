@@ -96,10 +96,9 @@ if (view) {
   });
   schedule(0);
 }
-const copy = document.querySelector('[data-copy]');
-copy?.addEventListener('click', async () => {
+document.querySelectorAll('[data-copy]').forEach(copy => copy.addEventListener('click', async () => {
   const text = document.getElementById(copy.dataset.copy);
-  const message = document.querySelector('[data-copy-status]');
+  const message = document.querySelector(`[data-copy-status="${copy.dataset.copy}"]`);
   try {
     await navigator.clipboard.writeText(text.textContent.trim());
     message.textContent = 'Copied.';
@@ -111,4 +110,4 @@ copy?.addEventListener('click', async () => {
     selection.addRange(range);
     message.textContent = 'Selected. Copy using your browser or keyboard.';
   }
-});
+}));

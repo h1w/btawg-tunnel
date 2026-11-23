@@ -99,9 +99,10 @@ string. It contains the client's private key; treat it as a secret.
 sudo ./btawg-client
 ```
 
-Choose **Install service**, paste the import into **VPN import** (hidden), and
-choose **Save and install**. The installer saves the import and generated SOCKS5
-credentials under `/etc/btawg`, then enables and starts `btawg-client.service`.
+Choose **Install service**, paste the `btawg://` import or [HTTPS subscription link](#https-profile-subscriptions)
+into **VPN import** (hidden), then choose **Save and install**. The installer
+saves the downloaded or pasted profile and generated SOCKS5 credentials under
+`/etc/btawg`, then enables and starts `btawg-client.service`.
 The imported mode starts enabled; other modes are reserved but off. Select a
 transport and press Enter or Space to toggle it without restarting the service.
 To edit the import, SOCKS5 address or base port, or TUN options, choose
@@ -197,9 +198,10 @@ name regardless of architecture.
 Extract the ZIP for your architecture with `btawg-client.exe`, `wintun.dll`,
 and `Wintun-LICENSE.txt` together. From an elevated Windows Terminal, run
 `./btawg-client.exe` and use **Install service** with the same `btawg://` import
-as on Linux. For unattended setup, run `./btawg-client.exe install -import-file
-client.txt`. The native Windows service starts at boot and works without the
-terminal. **Remove service** leaves your configuration and installed bundle.
+or HTTPS subscription link as on Linux. For unattended setup, run
+`./btawg-client.exe install -import-file client.txt`. The native Windows
+service starts at boot and works without the terminal. **Remove service**
+leaves your configuration and installed bundle.
 
 After installing the service, extract both files from
 `btawg-desktop-launcher.zip` onto your desktop. Double-click
@@ -595,6 +597,45 @@ endpoints and discovery hashes, the hub's public keys, and the client's
 private key. Treat it as a secret and share it only over a trusted channel.
 The BitTorrent handshake and DHT hash do not authenticate a peer: AWG or
 the pinned mutual TLS keys authenticate each encrypted connection.
+
+## HTTPS profile subscriptions
+
+The hub can serve private `btawg://` profiles directly over HTTPS on **TCP
+2228**. This listener is separate from the admin panel and VPN listeners.
+Point a stable public DNS name at the hub and allow inbound TCP 2228. Supply
+a PEM certificate chain trusted by the clients and a matching PEM private
+key. The certificate must cover the subscription hostname.
+
+For a managed server, set **Subscription public hostname**, **Subscription
+certificate PEM file** and **Subscription private key PEM file** in the
+server TUI's **Service settings**, or specify them on installation:
+
+```sh
+sudo ./btawg-server install \
+  -subscription-host profiles.example.com \
+  -subscription-cert /etc/letsencrypt/live/profiles.example.com/fullchain.pem \
+  -subscription-key /etc/letsencrypt/live/profiles.example.com/privkey.pem
+```
+
+Use the same flags with `btawg-server run` in foreground mode. Use absolute
+file paths for the service. After certificate renewal, restart the hub to
+load the new files; existing links remain valid. Leave all three arguments
+unset (or clear all three saved TUI fields) to disable the listener.
+
+1. In the web panel, go to **Clients → Import config → Issue subscription
+   link**, then copy the `https://…:2228/sub/…` URL. Treat it like the private
+   import string: anyone with the link can download the profile. **Rotate
+   subscription link** invalidates the previous URL without changing VPN keys.
+   Revoking or deleting a client also disables its downloads.
+2. Paste the URL into **VPN import** on Linux or Windows, or put it in the
+   secret file passed to `install -import-file`. To switch an existing client,
+   paste the link into **Service settings**. A static `btawg://` import removes
+   the subscription association.
+3. Use **Refresh subscription** in the client menu after changes to the active
+   hub configuration. An unchanged profile or failed fetch leaves the current
+   profile and running service alone. A changed profile preserves the enabled
+   transports and local settings; a running service restarts and a stopped
+   service stays stopped. There is no automatic refresh.
 
 ## Verification performed
 

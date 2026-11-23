@@ -96,7 +96,7 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("open store: %w", err)
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{bucketServer, bucketGroups, bucketClients} {
+		for _, b := range [][]byte{bucketServer, bucketGroups, bucketClients, bucketSubscriptions} {
 			if _, e := tx.CreateBucketIfNotExists(b); e != nil {
 				return e
 			}
@@ -309,6 +309,9 @@ func (s *Store) DeleteClient(id string) error {
 			}
 		}
 		if err := invalidateEgressClientTx(tx, id); err != nil {
+			return err
+		}
+		if err := tx.Bucket(bucketSubscriptions).Delete(key); err != nil {
 			return err
 		}
 		return clients.Delete(key)

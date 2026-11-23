@@ -36,14 +36,22 @@ func serverSetup() (*service.Screen, error) {
 	}
 	return &service.Screen{
 		Title: "Server settings", Submit: "Save settings",
-		Text: "Saving changes restarts a running service. Manage groups, gateways, clients and routing in the web panel.",
+		Text: "Saving changes restarts a running service. Set all three subscription fields for HTTPS on TCP 2228, or leave all three blank.",
 		Fields: []service.Field{
 			{Label: "Database path", Value: launch.Store},
 			{Label: "TUN interface", Value: launch.TUNName},
 			{Label: "Userspace only (no TUN)", Toggle: true, Checked: launch.NoTUN},
+			{Label: "Subscription public hostname", Value: launch.SubscriptionHost},
+			{Label: "Subscription certificate PEM file", Value: launch.SubscriptionCert},
+			{Label: "Subscription private key PEM file", Value: launch.SubscriptionKey},
 		},
 		Save: func(fields []service.Field) (*service.Screen, error) {
-			return nil, (serverLaunch{Store: strings.TrimSpace(fields[0].Value), TUNName: strings.TrimSpace(fields[1].Value), NoTUN: fields[2].Checked}).save()
+			launch.Store, launch.TUNName = strings.TrimSpace(fields[0].Value), strings.TrimSpace(fields[1].Value)
+			launch.NoTUN = fields[2].Checked
+			launch.SubscriptionHost = strings.TrimSpace(fields[3].Value)
+			launch.SubscriptionCert = strings.TrimSpace(fields[4].Value)
+			launch.SubscriptionKey = strings.TrimSpace(fields[5].Value)
+			return nil, launch.save()
 		},
 	}, nil
 }

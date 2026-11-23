@@ -214,10 +214,23 @@ const clientActionsTmpl = `{{define "client-actions"}}
 
 const importTmpl = `{{define "content"}}
 <h1>Import string — {{.Client.Name}}</h1>
+{{if .SubscriptionEnabled}}
+<div class="card"><h2>Profile subscription</h2>
+<p>Paste the HTTPS link into btawg-client. Use <b>Refresh subscription</b> to retrieve future changes. The link is a secret and does not expire.</p>
+{{if .SubscriptionURL}}
+<pre class="mono" id="subscription-url">{{.SubscriptionURL}}</pre>
+<p><button type="button" class="quiet" data-copy="subscription-url">Copy subscription link</button> <span class="sub" data-copy-status="subscription-url" role="status"></span></p>
+<p class="note">Rotating invalidates the previous link, not the VPN profile.</p>
+{{end}}
+<form method="post" action="/clients/subscription">
+<input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="id" value="{{.Client.ID}}">
+<button>{{if .SubscriptionURL}}Rotate subscription link{{else}}Issue subscription link{{end}}</button>
+</form></div>
+{{end}}
 <div class="card"><h2>btawg:// client bootstrap</h2>
 <p>This string contains the client's private key. Copy it over a trusted channel and paste it into <b>Install service</b> in the client TUI.</p>
 <pre class="mono" id="import-string">{{.Import}}</pre>
-<p><button type="button" class="quiet" data-copy="import-string">Copy import</button> <span class="sub" data-copy-status role="status"></span></p>
+<p><button type="button" class="quiet" data-copy="import-string">Copy import</button> <span class="sub" data-copy-status="import-string" role="status"></span></p>
 <p class="note">New imports connect directly. For foreground operation, pass the import to <code>btawg-client run</code>.</p>
 </div>
 <div class="card"><h2>Native config export</h2>

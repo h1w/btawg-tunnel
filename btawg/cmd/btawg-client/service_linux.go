@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -29,5 +30,20 @@ func installHelp() string { return "use sudo btawg-client to view SOCKS5 credent
 const setupRestartsService = false
 
 func persistClientSettings(save func() error) error { return save() }
+
+func persistSubscriptionProfile(save func() error) error {
+	state, _, err := service.Client.State()
+	if err != nil {
+		return err
+	}
+	if state != "active" && state != "activating" && state != "reloading" {
+		return save()
+	}
+	// Stop the daemon before writing: its control socket also saves settings.
+	if err := service.Client.Control("stop"); err != nil {
+		return err
+	}
+	return errors.Join(save(), service.Client.Control("start"))
+}
 
 func platformCommand([]string) (bool, error) { return false, nil }

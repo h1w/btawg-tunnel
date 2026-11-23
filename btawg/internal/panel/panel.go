@@ -61,6 +61,8 @@ type Panel struct {
 	user string
 	pass []byte // bcrypt hash
 
+	subscriptionBase string
+
 	mu        sync.Mutex
 	sessions  map[string]*session
 	fails     map[string]*failState
@@ -100,6 +102,7 @@ func (p *Panel) Handler() http.Handler {
 	mux.HandleFunc("POST /clients/move", p.auth(p.clientMove))
 	mux.HandleFunc("POST /clients/policy", p.auth(p.clientPolicy))
 	mux.HandleFunc("GET /clients/import", p.auth(p.clientImport))
+	mux.HandleFunc("POST /clients/subscription", p.auth(p.rotateSubscription))
 	mux.HandleFunc("GET /clients/native", p.auth(p.clientNative))
 	mux.HandleFunc("GET /groups", p.auth(p.groupsPage))
 	mux.HandleFunc("GET /groups/edit", p.auth(p.groupEdit))
@@ -522,22 +525,29 @@ func (p *Panel) clientImport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "client revoked", http.StatusForbidden)
 		return
 	}
-	cfg := p.reg.Config()
-	ccfg, err := p.buildClientConfig(rec, cfg)
+	s, err := p.clientProfile(rec)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s, err := ccfg.ImportString()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	var subscription string
+	if p.subscriptionBase != "" {
+		token, err := p.st.SubscriptionToken(rec.ID)
+		if err != nil {
+			http.Error(w, "subscription unavailable", http.StatusInternalServerError)
+			return
+		}
+		if token != "" {
+			subscription = p.subscriptionBase + token
+		}
 	}
 	p.render(w, "import", map[string]any{
-		"CSRF":   p.session(r).csrf,
-		"Client": rec,
-		"Import": s,
-		"Active": "clients",
+		"CSRF":                p.session(r).csrf,
+		"Client":              rec,
+		"Import":              s,
+		"Active":              "clients",
+		"SubscriptionEnabled": p.subscriptionBase != "",
+		"SubscriptionURL":     subscription,
 	})
 }
 

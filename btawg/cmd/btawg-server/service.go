@@ -34,12 +34,15 @@ type serverLaunch struct {
 	Store   string `json:"store"`
 	NoTUN   bool   `json:"no_tun,omitempty"`
 	TUNName string `json:"tun_name,omitempty"`
+	subscriptionSettings
 }
 
 func installCmd(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
 	storePath := fs.String("store", managedStorePath, "path to existing bbolt database to use")
 	noTun := fs.Bool("no-tun", false, "run overlay-only without kernel TUN or NAT")
+	var subscription subscriptionSettings
+	subscription.flags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -59,6 +62,7 @@ func installCmd(args []string) error {
 		case "no-tun":
 			launch.NoTUN = *noTun
 		}
+		launch.subscriptionSettings.override(f.Name, subscription)
 	})
 	if err := installServer(launch); err != nil {
 		return err
@@ -113,6 +117,9 @@ func (s serverLaunch) save() error {
 			return err
 		}
 	}
+	if _, err := s.subscriptionSettings.loadTLS(); err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -154,12 +161,16 @@ func runCmd(parent context.Context, args []string) error {
 	dhtBootstrap := fs.String("dht-bootstrap", "", "override DHT bootstrap nodes, comma-separated host:port (default: public)")
 	noTun := fs.Bool("no-tun", false, "userspace overlay only: no OS interface or Internet forwarding")
 	tunName := fs.String("tun", "btawg0", "TUN interface name in real-TUN mode")
+	var subscription subscriptionSettings
+	subscription.flags(fs)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	var launch serverLaunch
 
 	if *managed {
-		launch, err := loadServerLaunch()
+		var err error
+		launch, err = loadServerLaunch()
 		if err != nil {
 			return err
 		}
@@ -170,6 +181,12 @@ func runCmd(parent context.Context, args []string) error {
 			*tunName = launch.TUNName
 		}
 		*noTun = *noTun || launch.NoTUN
+	}
+	launch.subscriptionSettings.overrideFlags(fs, subscription)
+	subscription = launch.subscriptionSettings
+	subscriptionTLS, err := subscription.loadTLS()
+	if err != nil {
+		return err
 	}
 	if *storePath == "" {
 		*storePath = "btawg.db"
@@ -248,6 +265,16 @@ func runCmd(parent context.Context, args []string) error {
 	}
 
 	p := panel.New(st, srv, "admin", cfg.AdminPassHash)
+	var subscriptionServer *http.Server
+	var subscriptionErrors <-chan error
+	if subscriptionTLS != nil {
+		subscriptionServer, subscriptionErrors, err = startSubscription(ctx, p, subscription.SubscriptionHost, subscriptionTLS)
+		if err != nil {
+			return err
+		}
+		defer subscriptionServer.Close()
+		fmt.Printf("btawg-server: HTTPS subscriptions on TCP :%d\n", panel.SubscriptionPort)
+	}
 	web := &http.Server{Handler: p.Handler(), ReadHeaderTimeout: 5 * time.Second}
 	defer web.Close()
 	webErrors, err := srv.StartPanel(ctx, cfg.PanelPort, web)
@@ -274,10 +301,16 @@ func runCmd(parent context.Context, args []string) error {
 	case <-ctx.Done():
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return web.Shutdown(shutdown)
+		var subscriptionErr error
+		if subscriptionServer != nil {
+			subscriptionErr = subscriptionServer.Shutdown(shutdown)
+		}
+		return errors.Join(subscriptionErr, web.Shutdown(shutdown))
 	case err := <-errCh:
 		return err
 	case err := <-webErrors:
+		return err
+	case err := <-subscriptionErrors:
 		return err
 	}
 }

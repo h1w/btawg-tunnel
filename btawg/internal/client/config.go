@@ -178,6 +178,9 @@ type ManagedConfig struct {
 	PeerEndpoint       string         `json:"peer_endpoint,omitempty"`
 	PeerTCPEndpoint    string         `json:"peer_tcp_endpoint,omitempty"`
 	Peer               PeerSettings   `json:"peer"`
+
+	// SubscriptionURL is a secret, fetched only by an explicit client command.
+	SubscriptionURL string `json:"subscription_url,omitempty"`
 }
 
 // PortBase returns the first configured SOCKS5 listen port.

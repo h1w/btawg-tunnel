@@ -145,6 +145,8 @@ func persistClientSettings(save func() error) error {
 	return err
 }
 
+func persistSubscriptionProfile(save func() error) error { return persistClientSettings(save) }
+
 func platformCommand(args []string) (bool, error) {
 	if len(args) == 1 {
 		switch args[0] {

@@ -61,7 +61,7 @@ func fatal(err error) {
 // service arguments.
 func installMain(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
-	importFile := fs.String("import-file", "", "file containing the btawg:// import string (secret)")
+	importFile := fs.String("import-file", "", "file containing a btawg:// import or HTTPS subscription link (secret)")
 	socksListen := fs.String("socks-listen", "127.0.0.1", "SOCKS5 listen IPv4 address")
 	socksBase := fs.Int("socks-base-port", client.ManagedPortBase, "first port of the managed SOCKS5 block")
 	noTun := fs.Bool("no-tun", false, "userspace netstack mode: no OS interface")
@@ -85,7 +85,11 @@ func installMain(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := saveClientSettings(nil, raw, client.ManagedConfig{ListenIP: *socksListen, SOCKSBasePort: *socksBase, NoTUN: *noTun, TUNName: *tunName}); err != nil {
+		resolved, err := resolveVPNImport(raw, nil)
+		if err != nil {
+			return err
+		}
+		if err := saveClientSettings(nil, resolved, client.ManagedConfig{ListenIP: *socksListen, SOCKSBasePort: *socksBase, NoTUN: *noTun, TUNName: *tunName}); err != nil {
 			return err
 		}
 	} else if err != nil {
@@ -113,7 +117,7 @@ func readImport(path string) (string, error) {
 	if !term.IsTerminal(fd) {
 		return "", fmt.Errorf("pass -import-file FILE or run in a terminal to type the import")
 	}
-	fmt.Fprint(os.Stderr, "btawg-client: paste btawg:// import string: ")
+	fmt.Fprint(os.Stderr, "btawg-client: paste btawg:// import or HTTPS subscription link: ")
 	b, err := term.ReadPassword(fd)
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
