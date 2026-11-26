@@ -2,6 +2,8 @@ package tunsetup
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -217,4 +219,26 @@ func defaultRoutes(t *testing.T) []defaultRouteSnapshot {
 		return bytes.Compare(a.via[:], b.via[:])
 	})
 	return routes
+}
+
+func TestWaitForWindowsAdapterRemovalUsesIdentity(t *testing.T) {
+	id := WindowsAdapterIdentity{LUID: 42, GUID: windows.GUID{Data1: 0x1234, Data2: 0x5678, Data3: 0x9abc, Data4: [8]byte{1, 2, 3, 4, 5, 6, 7, 8}}, Alias: "btawg0"}
+	present := true
+	lookup := func(want WindowsAdapterIdentity) (bool, error) {
+		if want != id {
+			t.Fatalf("looked up %+v, want owned adapter identity", want)
+		}
+		return present, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	if err := waitForWindowsAdapterRemoval(ctx, id, lookup, 5*time.Millisecond); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("present adapter wait = %v, want deadline exceeded", err)
+	}
+	present = false
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := waitForWindowsAdapterRemoval(ctx, id, lookup, 5*time.Millisecond); err != nil {
+		t.Fatalf("removed adapter wait: %v", err)
+	}
 }

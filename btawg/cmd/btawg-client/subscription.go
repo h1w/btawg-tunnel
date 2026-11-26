@@ -66,12 +66,9 @@ func fetchSubscription(ctx context.Context, hc *http.Client, link string, local 
 	fetch.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	r, err := fetch.Do(req)
 	if err != nil {
-		// net/http wraps errors with the full bearer URL.
-		var uerr *url.Error
-		if errors.As(err, &uerr) {
-			err = uerr.Err
-		}
-		return vpnImport{}, fmt.Errorf("subscription HTTPS request failed: %w", err)
+		// Even a wrapped transport error can quote a malformed redirect's
+		// Location, which can contain the bearer path. Never persist it.
+		return vpnImport{}, errors.New("subscription HTTPS request failed")
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
@@ -180,6 +177,38 @@ func validSubscriptionProfile(cfg config.ClientConfig, local *client.ManagedConf
 		}
 	}
 	return true
+}
+
+// prepareUpdateProfile runs only during an explicitly requested Windows update.
+// Do not stop a working v1 service if its replacement profile cannot be fetched.
+func prepareUpdateProfile(ctx context.Context, hc *http.Client, path string) error {
+	local, err := client.LoadManagedConfig(path)
+	if err != nil {
+		return err
+	}
+	profile, err := config.ParseImportString(local.Import)
+	if err == nil || profile.Version != 1 {
+		return err
+	}
+	if local.SubscriptionURL == "" {
+		return errors.New("this update requires a version-2 profile; configure an HTTPS subscription before updating, or install with a fresh import")
+	}
+	resolved, err := fetchSubscription(ctx, hc, local.SubscriptionURL, &local)
+	if err != nil {
+		return err
+	}
+	latest, err := client.LoadManagedConfig(path)
+	if err != nil {
+		return err
+	}
+	if latest.Import != local.Import || latest.SubscriptionURL != local.SubscriptionURL {
+		return errors.New("enrollment changed during update preparation")
+	}
+	current, err := config.ParseImportString(resolved.profile)
+	if err != nil || !validSubscriptionProfile(current, &latest) {
+		return errors.New("subscription profile does not support the current transport selection")
+	}
+	return latest.StageUpdateProfile(path, resolved.profile)
 }
 
 func refreshSubscription(ctx context.Context, hc *http.Client, path string, apply func(func() error) error) (bool, error) {

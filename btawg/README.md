@@ -281,6 +281,12 @@ settings, keys, and the service's autostart setting. A running service is
 restarted; a stopped service stays stopped. On Windows the service selects a
 complete EXE/DLL bundle at a time. If the new service fails to start, the
 updater restores the previous executable or bundle and tries to restart it.
+For a Windows update from a version-1 subscription, update the hub first.
+The new bundle fetches the version-2 profile before stopping the old service.
+It keeps that profile under the protected client data directory for offline
+restarts; the old bundle retains its original enrollment on rollback. With a
+static version-1 import, configure an HTTPS subscription first or install the
+new bundle with a fresh export.
 
 Both dashboards show the current update stage at the bottom of the screen.
 During the download they show the percentage, or the amount downloaded if
@@ -509,9 +515,9 @@ The hub and client use a default tunnel MTU of 1280 bytes, including in
 
 **Automatic AWG recovery** applies to native `socks5-awg-udp` and the four
 AWG-over-BitTorrent modes in the left column above. Install the updated hub
-and client binaries, then select **Refresh subscription** on the managed
-client. It fetches the version-2 profile and restarts a running service on
-change, retaining local transport selections and balancer pools. A refresh
+and client binaries. **Refresh subscription** explicitly saves the version-2
+profile and restarts a running service on change, retaining local transport
+selections and balancer pools. A refresh
 does not install binaries. Static-import users need a newly exported profile.
 There is no environment variable or per-mode switch to enable recovery.
 

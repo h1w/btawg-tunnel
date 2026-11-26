@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"syscall"
 
 	"golang.org/x/sys/windows"
 	"gvisor.dev/gvisor/pkg/buffer"
@@ -257,6 +258,9 @@ func (o *windowsOverlay) dialTCP(ctx context.Context, owner *socketPath, local, 
 		}
 		if err != nil {
 			ep.Close()
+			if _, refused := err.(*tcpip.ErrConnectionRefused); refused {
+				return nil, fmt.Errorf("connect overlay TCP endpoint: %w", syscall.ECONNREFUSED)
+			}
 			return nil, fmt.Errorf("connect overlay TCP endpoint: %s", err)
 		}
 	}

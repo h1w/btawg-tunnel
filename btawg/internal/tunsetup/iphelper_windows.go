@@ -35,6 +35,21 @@ func findWindowsAdapter(name string) (windows.MibIfRow2, error) {
 	return windows.MibIfRow2{}, nil
 }
 
+func findWindowsAdapterByGUID(guid windows.GUID) (windows.MibIfRow2, error) {
+	var table *windows.MibIfTable2
+	if err := windows.GetIfTable2Ex(windows.MibIfTableNormalWithoutStatistics, &table); err != nil {
+		return windows.MibIfRow2{}, err
+	}
+	defer windows.FreeMibTable(unsafe.Pointer(table))
+	rows := unsafe.Slice(&table.Table[0], table.NumEntries)
+	for i := range rows {
+		if rows[i].InterfaceGuid == guid {
+			return rows[i], nil
+		}
+	}
+	return windows.MibIfRow2{}, nil
+}
+
 func rejectWindowsRouteOverlap(owned uint64, addr netip.Prefix, routes []netip.Prefix) error {
 	var table *windows.MibIpForwardTable2
 	if err := windows.GetIpForwardTable2(windows.AF_INET, &table); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,20 +31,103 @@ type windowsTransitionService interface {
 	selected() (string, error)
 	selectCommand(string) error
 	stop() error
+	waitOwnerGone() error
+	installRecoveryMonitor(*windowsUpdateTransition) error
+	isRunning() bool
 	start() error
 }
 
-type windowsSCMTransition struct{ service *mgr.Service }
+type windowsSCMTransition struct {
+	service *mgr.Service
+	owner   windowsServiceOwner
+}
 
-func (s windowsSCMTransition) selected() (string, error) {
+func (s *windowsSCMTransition) selected() (string, error) {
 	c, err := s.service.Config()
 	return c.BinaryPathName, err
 }
-func (s windowsSCMTransition) selectCommand(command string) error {
+func (s *windowsSCMTransition) selectCommand(command string) error {
 	return setServiceCommand(s.service, command)
 }
-func (s windowsSCMTransition) stop() error  { return stopService(s.service) }
-func (s windowsSCMTransition) start() error { return startService(s.service) }
+func (s *windowsSCMTransition) stop() error {
+	owner, err := captureWindowsServiceOwner(s.service)
+	if err != nil {
+		return err
+	}
+	s.owner = owner
+	return stopServiceControl(s.service)
+}
+func (s *windowsSCMTransition) waitOwnerGone() error {
+	return waitWindowsServiceOwnerGone(s.owner)
+}
+
+func (s *windowsSCMTransition) isRunning() bool {
+	status, err := s.service.Query()
+	return err == nil && status.State == svc.Running
+}
+
+// The stopped client no longer blocks stopping the dependent recovery
+// service. Replace the live monitor before selecting/starting the candidate.
+func (s *windowsSCMTransition) installRecoveryMonitor(tx *windowsUpdateTransition) error {
+	args, err := windows.DecomposeCommandLine(tx.NewCommand)
+	if err != nil || len(args) != 3 || args[1] != "run" || args[2] != "-managed" {
+		return errors.New("invalid staged update command")
+	}
+	executable := args[0]
+	want := windows.ComposeCommandLine([]string{executable, "update-recovery"})
+	m, err := mgr.Connect()
+	if err != nil {
+		return err
+	}
+	defer m.Disconnect()
+	recovery, err := m.OpenService(windowsRecoveryService)
+	if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
+		recovery, err = m.CreateService(windowsRecoveryService, executable, mgr.Config{DisplayName: "btawg update recovery", StartType: mgr.StartAutomatic, ServiceStartName: "LocalSystem"}, "update-recovery")
+	}
+	if err != nil {
+		return err
+	}
+	defer recovery.Close()
+	cfg, err := recovery.Config()
+	if err != nil {
+		return err
+	}
+	trusted, err := windows.DecomposeCommandLine(cfg.BinaryPathName)
+	if err != nil || len(trusted) != 2 || trusted[1] != "update-recovery" || !strings.EqualFold(cfg.ServiceStartName, "LocalSystem") || cfg.ServiceType != windows.SERVICE_WIN32_OWN_PROCESS || cfg.StartType != mgr.StartAutomatic {
+		return errors.New("refusing unrelated update recovery service")
+	}
+	if _, ok := Client.serviceExecutable(mgr.Config{BinaryPathName: windows.ComposeCommandLine([]string{trusted[0], "run", "-managed"}), ServiceStartName: cfg.ServiceStartName, ServiceType: cfg.ServiceType}); !ok {
+		return errors.New("refusing unrelated update recovery image")
+	}
+	alreadyRunning := false
+	if status, queryErr := recovery.Query(); queryErr == nil && status.State == svc.Running && status.ProcessId != 0 {
+		image, imageErr := windowsProcessImage(status.ProcessId)
+		alreadyRunning = imageErr == nil && strings.EqualFold(image, executable)
+	}
+	if strings.EqualFold(cfg.BinaryPathName, want) && alreadyRunning {
+		return nil
+	}
+	if err := stopServiceControl(recovery); err != nil {
+		return err
+	}
+	if err := setServiceCommand(recovery, want); err != nil {
+		return err
+	}
+	if err := startService(recovery); err != nil {
+		return err
+	}
+	status, err := recovery.Query()
+	if err != nil || status.State != svc.Running || status.ProcessId == 0 {
+		return errors.New("candidate recovery monitor is not running")
+	}
+	image, err := windowsProcessImage(status.ProcessId)
+	if err != nil || !strings.EqualFold(image, executable) {
+		return errors.New("candidate recovery monitor image mismatch")
+	}
+	return nil
+}
+
+func (s *windowsSCMTransition) start() error { return startService(s.service) }
 
 func rollbackWindowsTransition(s windowsTransitionService, tx windowsUpdateTransition, restart bool) error {
 	selected, err := s.selected()
@@ -55,6 +139,9 @@ func rollbackWindowsTransition(s windowsTransitionService, tx windowsUpdateTrans
 	}
 	if selected != tx.OldCommand {
 		if err := s.stop(); err != nil {
+			return err
+		}
+		if err := s.waitOwnerGone(); err != nil {
 			return err
 		}
 		if err := s.selectCommand(tx.OldCommand); err != nil {
@@ -69,6 +156,11 @@ func rollbackWindowsTransition(s windowsTransitionService, tx windowsUpdateTrans
 		}
 	}
 	if restart && tx.WasRunning {
+		if !s.isRunning() {
+			if err := s.waitOwnerGone(); err != nil {
+				return err
+			}
+		}
 		return s.start()
 	}
 	return nil
@@ -87,6 +179,15 @@ func activateWindowsTransition(s windowsTransitionService, tx windowsUpdateTrans
 			return err
 		}
 	}
+	if err := s.waitOwnerGone(); err != nil {
+		return err
+	}
+	if err := s.installRecoveryMonitor(&tx); err != nil {
+		if tx.WasRunning {
+			return errors.Join(err, s.start())
+		}
+		return err
+	}
 	if err := s.selectCommand(tx.NewCommand); err != nil {
 		return errors.Join(err, rollbackWindowsTransition(s, tx, true))
 	}
@@ -102,6 +203,9 @@ func activateWindowsTransition(s windowsTransitionService, tx windowsUpdateTrans
 	}
 	if !tx.WasRunning {
 		if err := s.stop(); err != nil {
+			return errors.Join(err, rollbackWindowsTransition(s, tx, true))
+		}
+		if err := s.waitOwnerGone(); err != nil {
 			return errors.Join(err, rollbackWindowsTransition(s, tx, true))
 		}
 	}
@@ -163,6 +267,21 @@ func windowsProcessCreation(pid uint32) (int64, error) {
 	}
 	return created.Nanoseconds(), nil
 }
+
+func windowsProcessImage(pid uint32) (string, error) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if err != nil {
+		return "", err
+	}
+	defer windows.CloseHandle(h)
+	buf := make([]uint16, 32768)
+	size := uint32(len(buf))
+	if err := windows.QueryFullProcessImageName(h, 0, &buf[0], &size); err != nil {
+		return "", err
+	}
+	return windows.UTF16ToString(buf[:size]), nil
+}
+
 func windowsHelperAlive(tx windowsUpdateTransition) bool {
 	if tx.HelperPID == 0 || tx.HelperCreated == 0 {
 		return false
@@ -172,6 +291,78 @@ func windowsHelperAlive(tx windowsUpdateTransition) bool {
 		return true
 	}
 	return err == nil && created == tx.HelperCreated
+}
+
+type windowsServiceOwner struct {
+	PID     uint32
+	Created int64
+}
+
+func windowsManagedTUNSettings() (name string, enabled bool) {
+	name, enabled = "btawg0", true
+	data, err := os.ReadFile(filepath.Join(ManagedDataDirectory(), "client.json"))
+	if err != nil {
+		return name, enabled
+	}
+	var cfg struct {
+		TUNName string `json:"tun_name"`
+		NoTUN   bool   `json:"no_tun"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return name, enabled
+	}
+	if cfg.TUNName != "" {
+		name = cfg.TUNName
+	}
+	return name, !cfg.NoTUN
+}
+
+func windowsManagedTUNName() string {
+	name, _ := windowsManagedTUNSettings()
+	return name
+}
+
+// Wait for the actual process that SCM reported, never for an adapter inferred
+// from its alias. The TUN creator owns adapter retirement and startup checks.
+func captureWindowsServiceOwner(s *mgr.Service) (windowsServiceOwner, error) {
+	var owner windowsServiceOwner
+	status, err := s.Query()
+	if err != nil {
+		return owner, err
+	}
+	owner.PID = status.ProcessId
+	if owner.PID != 0 {
+		created, err := windowsProcessCreation(owner.PID)
+		if err == nil {
+			owner.Created = created
+		}
+	}
+	return owner, nil
+}
+
+func waitWindowsServiceOwnerGone(owner windowsServiceOwner) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		processAlive := false
+		if owner.PID != 0 && owner.Created != 0 {
+			created, err := windowsProcessCreation(owner.PID)
+			processAlive = err == nil && created == owner.Created
+			if err != nil && !errors.Is(err, errHelperExited) && !errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
+				processAlive = true
+			}
+		}
+		if !processAlive {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("previous service process still present (pid=%d): %w", owner.PID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 func windowsLifecycleLock(ctx context.Context) (func(), error) {
@@ -233,7 +424,9 @@ func startWindowsRecoveryIfInstalled() error {
 	return startService(s)
 }
 
-// Recovery never removes bundles: the selected image or a running dashboard may hold them open.
+// At monitor startup, restore the command before reporting Running but keep
+// the journal if the dependent client must start. The next tick finishes the
+// restart after SCM can satisfy that dependency (also for manual services).
 func recoverWindowsTransition(restart bool) (windowsUpdateTransition, error) {
 	tx, err := loadWindowsTransition()
 	if errors.Is(err, os.ErrNotExist) {
@@ -261,8 +454,11 @@ func recoverWindowsTransition(restart bool) (windowsUpdateTransition, error) {
 	if err := Client.verifyInstalledService(s); err != nil {
 		return tx, err
 	}
-	if err := rollbackWindowsTransition(windowsSCMTransition{s}, tx, restart); err != nil {
+	if err := rollbackWindowsTransition(&windowsSCMTransition{service: s}, tx, restart); err != nil {
 		return tx, err
+	}
+	if !restart && tx.WasRunning {
+		return tx, writeWindowsUpdateResult("Windows update was interrupted; restoring the previous bundle...")
 	}
 	if err := writeWindowsUpdateResult("Windows update was interrupted and the previous bundle was restored."); err != nil {
 		return tx, err
@@ -273,7 +469,7 @@ func recoverWindowsTransition(restart bool) (windowsUpdateTransition, error) {
 	return tx, nil
 }
 
-func RunWindowsUpdateActivation() error {
+func RunWindowsUpdateActivation(prepare func() error) error {
 	unlock, err := windowsLifecycleLock(context.Background())
 	if err != nil {
 		return err
@@ -303,7 +499,16 @@ func RunWindowsUpdateActivation() error {
 	if err := Client.verifyInstalledService(s); err != nil {
 		return err
 	}
-	err = activateWindowsTransition(windowsSCMTransition{s}, tx)
+	if prepare != nil {
+		if err := prepare(); err != nil {
+			// No SCM mutations have occurred; leave the old service as it was.
+			if resultErr := writeWindowsUpdateResult("Windows update failed during preparation; previous bundle remains selected: " + err.Error()); resultErr != nil {
+				return errors.Join(err, resultErr)
+			}
+			return errors.Join(err, os.Remove(windowsTransitionPath()))
+		}
+	}
+	err = activateWindowsTransition(&windowsSCMTransition{service: s}, tx)
 	if err != nil {
 		// Leave the record for the monitor if rollback was incomplete.
 		if _, recoverErr := recoverWindowsTransition(true); recoverErr != nil {
@@ -325,6 +530,11 @@ func RunWindowsUpdateActivation() error {
 }
 
 func ensureWindowsRecoveryService(m *mgr.Mgr, client *mgr.Service, executable string) error {
+	want := windows.ComposeCommandLine([]string{executable, "update-recovery"})
+	wantValid := mgr.Config{BinaryPathName: windows.ComposeCommandLine([]string{executable, "run", "-managed"}), ServiceStartName: "LocalSystem", ServiceType: windows.SERVICE_WIN32_OWN_PROCESS}
+	if _, ok := Client.serviceExecutable(wantValid); !ok {
+		return errors.New("invalid update recovery executable")
+	}
 	recovery, err := m.OpenService(windowsRecoveryService)
 	if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
 		recovery, err = m.CreateService(windowsRecoveryService, executable, mgr.Config{DisplayName: "btawg update recovery", StartType: mgr.StartAutomatic, ServiceStartName: "LocalSystem"}, "update-recovery")
@@ -347,6 +557,15 @@ func ensureWindowsRecoveryService(m *mgr.Mgr, client *mgr.Service, executable st
 	}
 	if cfg.StartType != mgr.StartAutomatic {
 		return errors.New("update recovery service is not automatic")
+	}
+	if !strings.EqualFold(cfg.BinaryPathName, want) {
+		if err := setServiceCommand(recovery, want); err != nil {
+			return err
+		}
+		cfg, err = recovery.Config()
+		if err != nil || !strings.EqualFold(cfg.BinaryPathName, want) {
+			return errors.New("SCM did not select verified update recovery executable")
+		}
 	}
 	clientCfg, err := client.Config()
 	if err != nil {
@@ -386,57 +605,25 @@ type windowsRecoveryHandler struct{}
 
 func (windowsRecoveryHandler) Execute(_ []string, requests <-chan svc.ChangeRequest, statuses chan<- svc.Status) (bool, uint32) {
 	statuses <- svc.Status{State: svc.StartPending, CheckPoint: 1, WaitHint: 120000}
-	// No application lifecycle operation holds this lock while starting the
-	// recovery service, so boot recovery can finish before client startup.
-	unlock, err := windowsLifecycleLock(context.Background())
-	if err != nil {
+	tx, err := loadWindowsTransition()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return true, 1
 	}
-	tx, err := recoverWindowsTransition(false)
-	unlock()
-	if err != nil {
-		return true, 1
+	if err != nil || !windowsHelperAlive(tx) {
+		unlock, err := windowsLifecycleLock(context.Background())
+		if err != nil {
+			return true, 1
+		}
+		_, err = recoverWindowsTransition(false)
+		unlock()
+		if err != nil {
+			return true, 1
+		}
 	}
+	// A live activation helper holds lifecycle.lock. Acknowledge Running
+	// without taking that lock or touching its journal; otherwise cutover
+	// would deadlock or be mistaken for an abandoned update.
 	statuses <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
-	// A manually-started service was running before reboot; SCM will not restart it.
-	if tx.WasRunning && tx.StartType != mgr.StartAutomatic {
-		go func() {
-			m, e := mgr.Connect()
-			if e != nil {
-				return
-			}
-			defer m.Disconnect()
-			recovery, e := m.OpenService(windowsRecoveryService)
-			if e != nil {
-				return
-			}
-			defer recovery.Close()
-			if waitService(recovery, svc.Running) != nil {
-				return
-			}
-			unlock, e := windowsLifecycleLock(context.Background())
-			if e != nil {
-				return
-			}
-			defer unlock()
-			s, e := m.OpenService(Client.unitName())
-			if e != nil {
-				return
-			}
-			defer s.Close()
-			cfg, e := s.Config()
-			if e != nil {
-				return
-			}
-			status, e := s.Query()
-			if e != nil {
-				return
-			}
-			if cfg.BinaryPathName == tx.OldCommand && status.State == svc.Stopped && Client.verifyInstalledService(s) == nil {
-				_ = startService(s)
-			}
-		}()
-	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {

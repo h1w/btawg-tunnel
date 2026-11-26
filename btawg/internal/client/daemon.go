@@ -76,7 +76,7 @@ func runManagedAt(ctx context.Context, cfg ManagedConfig, cfgPath, socketPath st
 	if err := cfg.validatePeerSettings(realTUN); err != nil {
 		return err
 	}
-	importCfg, err := config.ParseImportString(cfg.Import)
+	importCfg, err := cfg.RuntimeProfile(cfgPath)
 	if err != nil {
 		return err
 	}

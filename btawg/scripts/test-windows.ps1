@@ -15,7 +15,7 @@ try {
         client = @('./internal/client', '^Test(Windows|Overlay|Daemon|Native|PeerUnderlay|Adaptive|ControlStatusReportsAdaptiveSelection)');
         carrier = @('./internal/carrier', '^TestTCPControlCarriesDuplexTraffic$');
         service = @('./internal/service', '^Test(ReleaseAssetMatchesTarget|WindowsManaged|WindowsBundle|UpdateLock|UpdateRecovery|UpdateActivation)');
-        cli = @('./cmd/btawg-client', '^Test(Peer|Adaptive)');
+        cli = @('./cmd/btawg-client', '^Test(Peer|Adaptive|RefreshSubscriptionMigratesV1ImportInPlace)');
         portmap = @('./internal/portmap', '^TestGateway');
         socks = @('./internal/socks', '^Test(ObservedBalancer|TransferObservation|DownloadStall)');
     }

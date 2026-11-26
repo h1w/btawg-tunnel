@@ -41,6 +41,10 @@ func (p *tunPath) proxySockets(c *Client, source netip.Addr) error {
 		return err
 	}
 	c.proxyTCP, c.proxyUDP = o.tcp, o.udp
+	// The overlay endpoint is the Windows equivalent of the native SOCKS
+	// socket: the hub relay owns each TCP session so an Internet ACL change
+	// closes streams already in flight, not just new packets.
+	c.nativeSOCKS = o.tcp
 	return nil
 }
 

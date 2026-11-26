@@ -1,6 +1,7 @@
 package tunsetup
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -11,13 +12,152 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 	"golang.zx2c4.com/wintun"
 )
+
+const windowsAdapterRemovalTimeout = 10 * time.Second
+
+var windowsAdapterPollInterval = 50 * time.Millisecond
+
+// WindowsAdapterIdentity identifies an adapter instance, not its mutable alias.
+type WindowsAdapterIdentity struct {
+	LUID  uint64
+	GUID  windows.GUID
+	Index uint32
+	Alias string
+}
+
+func adapterIdentity(row windows.MibIfRow2) WindowsAdapterIdentity {
+	return WindowsAdapterIdentity{
+		LUID:  row.InterfaceLuid,
+		GUID:  row.InterfaceGuid,
+		Index: row.InterfaceIndex,
+		Alias: windows.UTF16ToString(row.Alias[:]),
+	}
+}
+
+// A stale IP Helper row can outlive the Wintun device instance. Require the
+// corresponding SWD\Wintun device key before treating a GUID as a live adapter.
+func wintunDeviceRegistered(guid windows.GUID) (bool, error) {
+	path := `SYSTEM\CurrentControlSet\Enum\SWD\Wintun\` + strings.ToUpper(guid.String())
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
+	if errors.Is(err, registry.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	_ = key.Close()
+	return true, nil
+}
+
+// FindWindowsAdapterIdentity returns a registered Wintun device by alias.
+// Its absence does not authorize modifying any other adapter with that alias.
+func FindWindowsAdapterIdentity(alias string) (WindowsAdapterIdentity, bool, error) {
+	row, err := findWindowsAdapter(alias)
+	if err != nil || row.InterfaceLuid == 0 {
+		return WindowsAdapterIdentity{}, false, err
+	}
+	description := strings.ToLower(windows.UTF16ToString(row.Description[:]))
+	if !strings.Contains(description, "wintun") && !strings.Contains(description, "btawg") {
+		return WindowsAdapterIdentity{}, false, nil
+	}
+	registered, err := wintunDeviceRegistered(row.InterfaceGuid)
+	if err != nil || !registered {
+		return WindowsAdapterIdentity{}, false, err
+	}
+	return adapterIdentity(row), true, nil
+}
+
+// AdapterIdentityPresent checks the adapter instance by GUID/LUID and live PnP
+// registration. The alias may be foreign or stale and is not consulted.
+func AdapterIdentityPresent(id WindowsAdapterIdentity) (bool, error) {
+	if id.LUID == 0 {
+		return false, nil
+	}
+	registered, err := wintunDeviceRegistered(id.GUID)
+	if err != nil || !registered {
+		return false, err
+	}
+	row, err := findWindowsAdapterByGUID(id.GUID)
+	if err != nil || row.InterfaceLuid == 0 {
+		return false, err
+	}
+	return row.InterfaceLuid == id.LUID, nil
+}
+
+func waitForWindowsAdapterRemoval(ctx context.Context, id WindowsAdapterIdentity, present func(WindowsAdapterIdentity) (bool, error), interval time.Duration) error {
+	if id.LUID == 0 {
+		return nil
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		found, err := present(id)
+		if err != nil || !found {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("adapter %s (LUID %#x) still present: %w", id.GUID, id.LUID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+// WaitForWindowsAdapterRemoval waits until the identified adapter instance is
+// gone; Wintun deletion continues after the closing handle returns.
+func WaitForWindowsAdapterRemoval(ctx context.Context, id WindowsAdapterIdentity) error {
+	ctx, cancel := context.WithTimeout(ctx, windowsAdapterRemovalTimeout)
+	defer cancel()
+	return waitForWindowsAdapterRemoval(ctx, id, AdapterIdentityPresent, windowsAdapterPollInterval)
+}
+
+// WintunCloseAdapter has no status result. The Go binding can surface a stale
+// last-error, so adapter identity removal is the authority on close success.
+func closeOwnedWindowsAdapter(adapter *wintun.Adapter, id WindowsAdapterIdentity, causes ...error) error {
+	closeErr := adapter.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), windowsAdapterRemovalTimeout)
+	defer cancel()
+	waitErr := waitForWindowsAdapterRemoval(ctx, id, AdapterIdentityPresent, windowsAdapterPollInterval)
+	if waitErr != nil {
+		return errors.Join(append(causes, closeErr, waitErr)...)
+	}
+	return errors.Join(causes...)
+}
+
+func waitForAliasReleased(name string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		row, err := findWindowsAdapter(name)
+		if err != nil || row.InterfaceLuid == 0 {
+			return err
+		}
+		if !strings.EqualFold(windows.UTF16ToString(row.Description[:]), "btawg Tunnel") {
+			return fmt.Errorf("interface %q is already in use", name)
+		}
+		live, err := wintunDeviceRegistered(row.InterfaceGuid)
+		if err != nil || !live {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("interface %q is already in use", name)
+		case <-ticker.C:
+		}
+	}
+}
 
 // OpenClientTUN creates a Wintun adapter with the assigned VPN address and
 // overlay routes. No foreign adapter or default route is modified.
@@ -41,7 +181,9 @@ func OpenClientTUN(name string, addr netip.Prefix, routes []string, mtu int) (tu
 		return nil, fmt.Errorf("look up adapter %q: %w", name, err)
 	}
 	if row.InterfaceLuid != 0 {
-		return nil, fmt.Errorf("interface %q is already in use", name)
+		if err := waitForAliasReleased(name); err != nil {
+			return nil, err
+		}
 	}
 	if err := rejectWindowsRouteOverlap(0, addr, prefixes); err != nil {
 		return nil, err
@@ -60,6 +202,10 @@ func OpenClientTUN(name string, addr netip.Prefix, routes []string, mtu int) (tu
 		return nil, fmt.Errorf("create Wintun adapter: %w", err)
 	}
 	luid := adapter.LUID()
+	identity := WindowsAdapterIdentity{LUID: luid, GUID: id, Alias: name}
+	closeOnFailure := func(causes ...error) error {
+		return closeOwnedWindowsAdapter(adapter, identity, causes...)
+	}
 	registerUnderlayAdapter(luid, true)
 	ok := false
 	defer func() {
@@ -68,27 +214,27 @@ func OpenClientTUN(name string, addr netip.Prefix, routes []string, mtu int) (tu
 		}
 	}()
 	if err := renameWindowsAdapter(luid, name); err != nil {
-		return nil, errors.Join(err, adapter.Close())
+		return nil, closeOnFailure(err)
 	}
 	if err := rejectWindowsRouteOverlap(luid, addr, prefixes); err != nil {
-		return nil, errors.Join(err, adapter.Close())
+		return nil, closeOnFailure(err)
 	}
 	if err := configureWindowsTUN(luid, addr, prefixes, mtu); err != nil {
-		return nil, errors.Join(err, adapter.Close())
+		return nil, closeOnFailure(err)
 	}
 	session, err := adapter.StartSession(8 << 20)
 	if err != nil {
-		return nil, errors.Join(err, adapter.Close())
+		return nil, closeOnFailure(err)
 	}
 	stop, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
 		session.End()
-		return nil, errors.Join(err, adapter.Close())
+		return nil, closeOnFailure(err)
 	}
 	events := make(chan tun.Event, 1)
 	events <- tun.EventUp
 	ok = true
-	return &windowsTUN{adapter: adapter, session: session, name: name, mtu: mtu, stop: stop, events: events}, nil
+	return &windowsTUN{adapter: adapter, session: session, name: name, mtu: mtu, stop: stop, events: events, identity: identity}, nil
 }
 
 func renameWindowsAdapter(luid uint64, name string) error {
@@ -113,15 +259,16 @@ Rename-NetAdapter -InputObject $adapter -NewName $env:BTAWG_ADAPTER_NAME -Confir
 }
 
 type windowsTUN struct {
-	adapter *wintun.Adapter
-	session wintun.Session
-	name    string
-	mtu     int
-	stop    windows.Handle
-	events  chan tun.Event
-	mu      sync.Mutex // Serializes write, close and reader admission.
-	reading sync.WaitGroup
-	closed  bool
+	adapter  *wintun.Adapter
+	session  wintun.Session
+	identity WindowsAdapterIdentity
+	name     string
+	mtu      int
+	stop     windows.Handle
+	events   chan tun.Event
+	mu       sync.Mutex // Serializes write, close and reader admission.
+	reading  sync.WaitGroup
+	closed   bool
 }
 
 func (t *windowsTUN) Name() (string, error)    { return t.name, nil }
@@ -201,9 +348,8 @@ func (t *windowsTUN) Close() error {
 	t.session.End()
 	close(t.events)
 	luid := t.adapter.LUID()
-	err := errors.Join(windows.CloseHandle(t.stop), t.adapter.Close())
-	registerUnderlayAdapter(luid, false)
-	return err
+	defer registerUnderlayAdapter(luid, false)
+	return closeOwnedWindowsAdapter(t.adapter, t.identity, windows.CloseHandle(t.stop))
 }
 
 func (t *windowsTUN) interfaceIndex() (uint32, error) {

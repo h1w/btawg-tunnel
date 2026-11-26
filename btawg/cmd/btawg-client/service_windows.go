@@ -153,7 +153,9 @@ func platformCommand(args []string) (bool, error) {
 		case "update-recovery":
 			return true, service.RunWindowsUpdateRecovery()
 		case "update-activate":
-			return true, service.RunWindowsUpdateActivation()
+			return true, service.RunWindowsUpdateActivation(func() error {
+				return prepareUpdateProfile(context.Background(), subscriptionHTTP, client.ManagedConfigPath)
+			})
 		}
 	}
 	return false, nil

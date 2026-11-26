@@ -316,6 +316,24 @@ func startService(s *mgr.Service) error {
 }
 
 func stopService(s *mgr.Service) error {
+	status, err := s.Query()
+	if err != nil {
+		return err
+	}
+	if status.State == svc.Stopped {
+		return stopServiceControl(s)
+	}
+	owner, err := captureWindowsServiceOwner(s)
+	if err != nil {
+		return err
+	}
+	if err := stopServiceControl(s); err != nil {
+		return err
+	}
+	return waitWindowsServiceOwnerGone(owner)
+}
+
+func stopServiceControl(s *mgr.Service) error {
 	if _, err := s.Control(svc.Stop); err != nil && !errors.Is(err, windows.ERROR_SERVICE_NOT_ACTIVE) && !errors.Is(err, windows.ERROR_SERVICE_CANNOT_ACCEPT_CTRL) {
 		return err
 	}

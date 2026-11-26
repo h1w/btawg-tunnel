@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
+
+	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
 func TestUpdateSCMActivatesVerifiedBundle(t *testing.T) {
@@ -40,6 +43,11 @@ func TestUpdateSCMActivatesVerifiedBundle(t *testing.T) {
 	}
 	exe := filepath.Join(bundle, "btawg-client.exe")
 	old := Client.binaryPath()
+	tunName := windowsManagedTUNName()
+	formerAdapter, hadAdapter, err := tunsetup.FindWindowsAdapterIdentity(tunName)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Client.handoffWindowsBundle(exe); err != nil {
 		t.Fatal(err)
 	}
@@ -61,6 +69,30 @@ func TestUpdateSCMActivatesVerifiedBundle(t *testing.T) {
 			cfg, err := recovery.Config()
 			if err != nil || cfg.StartType != mgr.StartAutomatic {
 				t.Fatalf("recovery autostart: %v, %v", cfg.StartType, err)
+			}
+			args, err := windows.DecomposeCommandLine(cfg.BinaryPathName)
+			if err != nil || len(args) != 2 || args[1] != "update-recovery" || !strings.EqualFold(args[0], exe) {
+				t.Fatalf("recovery image = %q, want verified bundle %q: %v", cfg.BinaryPathName, exe, err)
+			}
+			status, err := recovery.Query()
+			if err != nil || status.State != svc.Running || status.ProcessId == 0 {
+				t.Fatalf("recovery monitor not running: %v pid=%d", err, status.ProcessId)
+			}
+			image, err := windowsProcessImage(status.ProcessId)
+			if err != nil || !strings.EqualFold(image, exe) {
+				t.Fatalf("running recovery image = %q, want %q: %v", image, exe, err)
+			}
+			if hadAdapter {
+				if err := tunsetup.WaitForWindowsAdapterRemoval(t.Context(), formerAdapter); err != nil {
+					t.Fatalf("former adapter still present after update: %v", err)
+				}
+				current, ok, err := tunsetup.FindWindowsAdapterIdentity(tunName)
+				if err != nil || !ok {
+					t.Fatalf("replacement adapter missing: %v", err)
+				}
+				if current.GUID == formerAdapter.GUID {
+					t.Fatalf("update reused former adapter %s", formerAdapter.GUID)
+				}
 			}
 			return
 		}
@@ -86,6 +118,10 @@ func TestUpdateSCMRestoresAbandonedBundleSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	formerAdapter, hadAdapter, err := tunsetup.FindWindowsAdapterIdentity(windowsManagedTUNName())
+	if err != nil {
+		t.Fatal(err)
+	}
 	unlock, err := windowsLifecycleLock(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -108,6 +144,18 @@ func TestUpdateSCMRestoresAbandonedBundleSelection(t *testing.T) {
 		cfg, err := s.Config()
 		if err == nil && cfg.BinaryPathName == old.BinaryPathName && strings.Contains(WindowsUpdateNotice(), "previous bundle was restored") {
 			if state, _, err := Client.State(); err == nil && state == "active" {
+				if hadAdapter {
+					if err := tunsetup.WaitForWindowsAdapterRemoval(t.Context(), formerAdapter); err != nil {
+						t.Fatalf("former adapter still present after rollback: %v", err)
+					}
+					current, ok, err := tunsetup.FindWindowsAdapterIdentity(windowsManagedTUNName())
+					if err != nil || !ok {
+						t.Fatalf("restored adapter missing: %v", err)
+					}
+					if current.GUID == formerAdapter.GUID {
+						t.Fatalf("rollback reused former adapter %s", formerAdapter.GUID)
+					}
+				}
 				return
 			}
 		}

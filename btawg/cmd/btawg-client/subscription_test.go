@@ -114,7 +114,7 @@ func TestRefreshSubscriptionMigratesV1ImportInPlace(t *testing.T) {
 		io.WriteString(w, v2+"\n")
 	}))
 	defer s.Close()
-	path := filepath.Join(t.TempDir(), "client.json")
+	path := filepath.Join(t.TempDir(), "managed", "client.json")
 	saved := client.ManagedConfig{
 		Import: v1, SubscriptionURL: s.URL + "/sub/example",
 		Enabled: []string{config.ModeReqTCP}, ListenIP: "127.0.0.4", TUNName: "my-tun", SOCKSBasePort: 12080,
@@ -125,6 +125,48 @@ func TestRefreshSubscriptionMigratesV1ImportInPlace(t *testing.T) {
 	if err := saved.Save(path); err != nil {
 		t.Fatal(err)
 	}
+
+	// Activation must boot offline with the new profile, without overwriting
+	// the only import the previous executable can use on rollback.
+	if err := prepareUpdateProfile(t.Context(), s.Client(), path); err != nil {
+		t.Fatal(err)
+	}
+	onDisk, err := client.LoadManagedConfig(path)
+	if err != nil || !reflect.DeepEqual(onDisk, saved) {
+		t.Fatal("preparation changed the previous service configuration", err)
+	}
+	effective, err := onDisk.RuntimeProfile(path)
+	if err != nil || effective.Version != 2 || effective.CarrierEndpoint != profile.CarrierEndpoint {
+		t.Fatal("prepared profile unavailable at startup", err)
+	}
+	completeTestRefresh(t, s, path, saved, v2)
+	onDisk.SubscriptionURL += "/replacement"
+	if _, err := onDisk.RuntimeProfile(path); err == nil {
+		t.Fatal("reused prepared profile after the subscription changed")
+	}
+	onDisk = saved
+	onDisk.Import += " "
+	if _, err := onDisk.RuntimeProfile(path); err == nil {
+		t.Fatal("reused prepared profile after the enrollment changed")
+	}
+}
+
+func TestSubscriptionRedirectDoesNotExposeBearer(t *testing.T) {
+	const token = "sensitive-fixture-token"
+	s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/"+token+"/%zz")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer s.Close()
+	_, err := fetchSubscription(t.Context(), s.Client(), s.URL+"/"+token, nil)
+	if err == nil || strings.Contains(err.Error(), token) {
+		t.Fatalf("did not return a safe redirect failure: %v", err)
+	}
+}
+
+// Explicit refresh still replaces the stored legacy import after activation.
+func completeTestRefresh(t *testing.T, s *httptest.Server, path string, saved client.ManagedConfig, v2 string) {
+	t.Helper()
 
 	changed, err := refreshSubscription(context.Background(), s.Client(), path, func(save func() error) error { return save() })
 	if err != nil || !changed {
