@@ -36,6 +36,7 @@ type ControlResponse struct {
 	Balancers               map[string][]string `json:"balancers,omitempty"`
 	AdaptiveMode            string              `json:"adaptive_mode,omitempty"`
 	WindowsSOCKSQueueStalls uint64              `json:"windows_socks_queue_stalls,omitempty"`
+	TUNQueueDrops           uint64              `json:"tun_queue_drops,omitempty"`
 	Credentials             *Credentials        `json:"credentials,omitempty"`
 	Routes                  []RouteOption       `json:"routes,omitempty"`
 	SelectedRoutes          map[int]string      `json:"selected_routes,omitempty"`
@@ -189,6 +190,7 @@ func (d *clientControl) handle(req ControlRequest) ControlResponse {
 	b.mu.Unlock()
 	if d.m.shared != nil {
 		r.WindowsSOCKSQueueStalls = d.m.shared.overlayQueueStalls.Load()
+		r.TUNQueueDrops = d.m.shared.tunQueueDrops.Load()
 	}
 	return r
 }

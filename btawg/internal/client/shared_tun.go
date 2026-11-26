@@ -38,6 +38,7 @@ type sharedTUN struct {
 	done               chan struct{}
 	readErr            error // published by closing done
 	overlayQueueStalls atomic.Uint64
+	tunQueueDrops      atomic.Uint64
 
 	mu             sync.RWMutex
 	ports          map[localPort]*socketPath
@@ -171,10 +172,15 @@ func (s *sharedTUN) dispatch() {
 			}
 			flags := binary.BigEndian.Uint16(p[6:8])
 			var path *tunPath
+			var id fragmentID
+			var firstFragment bool
+			var now time.Time
 			if flags&0x3fff != 0 {
-				now := time.Now()
-				id := fragmentID{[4]byte(p[12:16]), [4]byte(p[16:20]), binary.BigEndian.Uint16(p[4:6]), p[9]}
-				if flags&0x1fff == 0 {
+				now = time.Now()
+				id = fragmentID{[4]byte(p[12:16]), [4]byte(p[16:20]), binary.BigEndian.Uint16(p[4:6]), p[9]}
+				firstFragment = flags&0x1fff == 0
+				if firstFragment {
+					delete(fragments, id)
 					if len(fragments) >= 4096 && !now.Before(nextPrune) {
 						for k, f := range fragments {
 							if !now.Before(f.before) {
@@ -187,7 +193,6 @@ func (s *sharedTUN) dispatch() {
 						continue
 					}
 					path = s.packetPath(p, hlen)
-					fragments[id] = fragmentPath{path, now.Add(30 * time.Second)}
 				} else if f, ok := fragments[id]; ok && now.Before(f.before) {
 					path = f.path
 					if flags&0x2000 == 0 {
@@ -197,9 +202,23 @@ func (s *sharedTUN) dispatch() {
 			} else {
 				path = s.packetPath(p, hlen)
 			}
-			if path != nil && s.enqueuePacket(path, storage[i], b, p) == enqueueOK {
+			if path == nil {
+				continue
+			}
+			switch s.enqueuePacket(path, storage[i], b, p) {
+			case enqueueOK:
+				if firstFragment {
+					fragments[id] = fragmentPath{path, now.Add(30 * time.Second)}
+				}
 				storage[i] = s.pool.Get().(*[]byte)
 				bufs[i] = (*storage[i])[:cap(*storage[i])]
+			case enqueueFull:
+				s.tunQueueDrops.Add(1)
+				fallthrough
+			case enqueueRejected:
+				if flags&0x3fff != 0 {
+					delete(fragments, id)
+				}
 			}
 		}
 	}
@@ -288,6 +307,15 @@ func (s *sharedTUN) enqueueOverlayPacket(ctx context.Context, p *tunPath, storag
 }
 
 func (p *tunPath) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
+	return p.read(bufs, sizes, offset, nil)
+}
+
+// ReadWithWake interrupts an idle first-packet wait for outer control traffic.
+func (p *tunPath) ReadWithWake(bufs [][]byte, sizes []int, offset int, wake <-chan struct{}) (int, error) {
+	return p.read(bufs, sizes, offset, wake)
+}
+
+func (p *tunPath) read(bufs [][]byte, sizes []int, offset int, wake <-chan struct{}) (int, error) {
 	for n := 0; n < len(bufs); {
 		var b *[]byte
 		if n == 0 {
@@ -296,6 +324,8 @@ func (p *tunPath) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 				return 0, net.ErrClosed
 			case <-p.shared.done:
 				return 0, p.shared.readErr
+			case <-wake:
+				return 0, nil
 			case b = <-p.packets:
 			}
 		} else {

@@ -35,17 +35,27 @@ func (c *Client) configureForegroundTUN(dev tun.Device, name string) (tun.Device
 	}
 	c.closeTUN = route.Close
 	local := netip.AddrPortFrom(netip.MustParseAddr(c.cfg.ClientIP), 0)
-	dialer := net.Dialer{
-		LocalAddr: net.TCPAddrFromAddrPort(local),
-		Control: func(network, address string, socket syscall.RawConn) error {
-			if err := route.Control(network, address, socket); err != nil {
-				return err
+	makeDial := func(control func(string, string, syscall.RawConn) error, native bool) func(context.Context, netip.AddrPort) (net.Conn, error) {
+		dialer := net.Dialer{
+			LocalAddr: net.TCPAddrFromAddrPort(local),
+			Control: func(network, address string, socket syscall.RawConn) error {
+				if err := route.Control(network, address, socket); err != nil {
+					return err
+				}
+				return control(network, address, socket)
+			},
+		}
+		return func(ctx context.Context, dst netip.AddrPort) (net.Conn, error) {
+			conn, err := dialer.DialContext(ctx, "tcp4", dst.String())
+			if err == nil && native {
+				tunsetup.TuneNativeUpload(conn.(*net.TCPConn))
 			}
-			return tunsetup.OverlayTCP(network, address, socket)
-		},
+			return conn, err
+		}
 	}
-	c.proxyTCP = func(ctx context.Context, dst netip.AddrPort) (net.Conn, error) {
-		return dialer.DialContext(ctx, "tcp4", dst.String())
+	c.proxyTCP = makeDial(tunsetup.OverlayTCP, false)
+	if config.IsNativeMode(c.cfg.Transport) {
+		c.nativeSOCKS = makeDial(tunsetup.NativeSOCKSTCP, true)
 	}
 	listen := net.ListenConfig{Control: route.Control}
 	c.proxyUDP = func(ctx context.Context) (net.PacketConn, error) {

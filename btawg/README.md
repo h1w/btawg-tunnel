@@ -431,6 +431,44 @@ disables it). Measure direct UDP goodput and packet loss in each direction
 before tuning. The cap is not a promised application throughput; all µTP
 peers on the hub share its pacing budget. TCP modes ignore this setting.
 
+The authenticated admin endpoint `GET /api/traffic` includes
+`engine_queue_drops`: cumulative packets rejected because a hub engine's
+outbound queue was full, keyed by transport mode (`tls` aggregates TLS
+sessions). Counters reset on hub restart; kernel, WAN, policy, and shutdown
+drops are not included. Compare deltas between samples.
+
+The managed client's local control `status` response includes
+`tun_queue_drops` once nonzero. It counts packets rejected by full shared
+TUN transport queues since client start. It excludes policy/shutdown
+rejections, kernel and WAN losses, and Windows SOCKS backpressure events.
+
+SOCKS CONNECT propagates TCP half-close through direct and routed sessions:
+after a client finishes writing, the destination can still send its reply.
+
+On Linux, native WG/AWG SOCKS CONNECT automatically uses BBR on the
+client's TUN-bound TCP data socket when the kernel supports it. An updated
+real-TUN hub automatically splits the TCP connection and prefers BBR toward
+the client. Its relay listens on overlay TCP **1058** only, checks the
+enrolled client's current Internet permission, and dials only public IPv4
+over the hub uplink. No flags, profile changes, or WAN port forwarding are
+needed. If an older hub refuses the relay connection, the client uses the
+existing routed/NAT path; relay denials do not fall back. UDP, transparent
+TUN traffic, mesh-routed exits, and other transport modes are unchanged.
+
+The hub widens the send buffer on established BBR relay sockets with
+measured RTT at least 20 ms, within the kernel's per-socket limit and only
+when this exceeds the existing autotune ceiling. It automatically limits
+BBR probes using acknowledged delivery and queue delay, without a fixed
+Mbps setting. No receive-window, host sysctl, or interface qdisc changes;
+short transfers and LAN sockets retain the normal BBR startup path.
+
+On the Linux client, native WG/AWG SOCKS uploads keep the initial send
+buffer until an established BBR socket shows sustained send-buffer pressure
+at a measured RTT of at least 20 ms without queue buildup. The client
+then caps BBR pacing probes before requesting a larger send buffer, up to
+4 MiB requested (8 MiB accounted where the kernel allows it). LAN sockets
+and sockets without measured pressure retain the initial buffer.
+
 ## Run a client (any PC)
 
 ```sh
@@ -465,11 +503,66 @@ The hub and client use a default tunnel MTU of 1280 bytes, including in
 | `socks5-awg-req-utp` | `socks5-req-utp` | Request/piece over µTP (UDP) |
 
 `socks5-awg-udp` and `socks5-wg-udp` are native AWG and WG without BitTorrent.
+
+**Automatic AWG recovery** applies to native `socks5-awg-udp` and the four
+AWG-over-BitTorrent modes in the left column above. Install the updated hub
+and client binaries, then select **Refresh subscription** on the managed
+client. It fetches the version-2 profile and restarts a running service on
+change, retaining local transport selections and balancer pools. A refresh
+does not install binaries. Static-import users need a newly exported profile.
+There is no environment variable or per-mode switch to enable recovery.
+
+Negotiation, feedback and parity run inside the existing AWG engine. They
+do not open another socket or change BitTorrent framing, TCP, µTP, plain WG,
+or TLS-only modes. Recovery keys are specific to the transport, enrollment
+and session; data-derived controls are encrypted for that peer before AWG
+may route the frame. The client renegotiates on carrier attachment. The inner
+layer cannot repair bytes still awaiting an outer retransmission.
+
+On native AWG at ≥80 ms handshake RTT, a fresh direction may protect groups
+of eight eligible TCP data packets with two parity rows. The provisional
+budget ends after 4 seconds or 32 MiB at most; verified delivery of 64 intact
+groups without a raw loss report or reconstruction can release it earlier.
+The four ordered carriers skip provisional parity and measure inner delivery
+from the start. For all five AWG paths, continuing repair needs loss evidence and spare
+capacity. The active repair limit is 2 MiB of advertised TCP credit per
+peer and direction, not per socket. Provisional parity alone does not
+impose that limit: the receiver first needs evidence of loss.
+UDP, fragments and pure ACKs are not FEC data.
+Low-RTT paths use periodic RTT probes instead of recording each data packet.
+The hub's authenticated `/api/traffic` endpoint aggregates `awg_recovery`
+counters over the five engines; `coded_pieces`, `recovered_packets` and
+`window_clamps` count actions, and `auto_tx_on/off` and `auto_rx_on/off`
+count transitions of continuing repair, not the provisional flight.
+
+The hub reads up to 16 already queued outbound packets at once for the five
+AWG engines and native WG, without waiting to fill a batch. TLS-only engines
+retain their existing queue behavior. Carrier framing and MTU are unchanged.
+If a TUN read exceeds the segmentation buffer, the hub forwards the segments
+that fit and continues reading instead of stopping the shared router.
+The TLS packet reader likewise forwards the segments that fit and keeps the
+tunnel alive; genuine device errors still stop the reader.
+The hub recycles packet buffers without per-packet heap allocation on a pool
+hit and uses one route timestamp per read batch. Each packet is still checked
+against the current route and access policy before delivery.
+For uploads, the hub also reuses a bounded buffer of TUN batch headers so
+Linux GRO can mutate them without changing the engine's slice headers.
+If the native WG or an AWG engine queue is full, the dispatcher yields once
+per shared TUN batch. An AWG peer with active repair can also spend the
+batch's shared 1 ms admission budget; remaining overflow counts as drops.
+This changes neither the outer carrier queues nor the TLS-only data path.
+The hub's reverse-flow table maintains eviction order in constant time per
+hit. It retains the same capacity and authenticated pin lifetime.
+An older authenticated packet batch cannot replace the newer primary route
+used for traffic that has no reverse-flow pin.
+For AWG over a carrier, the client configures the hub peer only after the
+carrier is attached, so the initial keepalive cannot spend a handshake
+retry interval on a path that is not connected yet.
+
 SOCKS5 supports TCP and UDP in all modes; direct VPN IP traffic uses the same
 tunnel without SOCKS5. The four TLS modes use the same IPv4 addresses and
-hub ACLs as AWG/WG. Upgrade both binaries and re-export the import to get the
-TLS server pin and discovery hashes. Existing imports and short names remain
-usable in the original modes; there is no TLS-to-AWG fallback.
+hub ACLs as AWG/WG. The current profile supplies the TLS server pin and
+discovery hashes. There is no TLS-to-AWG fallback.
 
 ### Client-to-client
 
@@ -742,9 +835,9 @@ one run below that threshold.
   session and injected the discovery result; it does not measure startup,
   single-stream speed, or a public WAN. Earlier `req-utp` tuning trials
   also fell below 500 Mbit/s, so the result is not a sustained minimum.
-  Real-TUN mode uses Reno and a bounded send buffer on the inner SOCKS TCP
-  sockets and a larger transmit queue on the overlay TUN. The outer TCP
-  carrier uses BBR where available; other TCP sockets keep the host default.
+  Linux real-TUN SOCKS data sockets have bounded send buffers. Native
+  WG/AWG prefers BBR; other overlay sockets use Reno. The outer TCP
+  carrier uses BBR where available. No system TCP defaults are changed.
   Loopback SOCKS CONNECT legs use bounded buffers. No host-wide TCP setting
   or WAN qdisc is changed.
 - No IPv6 overlay, rate limits, LAN-behind-client routing, or kill switch.

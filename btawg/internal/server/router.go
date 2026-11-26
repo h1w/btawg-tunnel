@@ -1,21 +1,31 @@
 package server
 
 import (
+	"errors"
 	"net"
 	"net/netip"
 	"os"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
 	"github.com/amnezia-vpn/amneziawg-go/v3/device"
 	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
 	"golang.org/x/net/ipv4"
 
+	"bittorrent-tunnel/btawg/internal/awgrepair"
+	"bittorrent-tunnel/btawg/internal/config"
+	"bittorrent-tunnel/btawg/internal/hubrelay"
 	"bittorrent-tunnel/btawg/internal/mesh"
 	"bittorrent-tunnel/btawg/internal/tunneldns"
 )
 
-const routerBufSize = 2048
+const (
+	routerBufSize   = 2048
+	nativeBatchSize = 16
+)
 
 var tunOffset = device.MessageTransportOffsetContent // 16 bytes of virtio/transport headroom
 
@@ -39,21 +49,30 @@ type packetRouter struct {
 	routesMu sync.RWMutex
 	routes   map[netip.Addr]activeRoute
 
-	flows *flowTable
+	flows         *flowTable
+	tlsQueueDrops atomic.Uint64
 
 	closed    chan struct{}
 	closeOnce sync.Once
 	closeErr  error
 
-	pool    sync.Pool
-	readWg  sync.WaitGroup
-	eventWg sync.WaitGroup
-	flowWg  sync.WaitGroup
+	pool           sync.Pool
+	writeBatchPool sync.Pool
+	readWg         sync.WaitGroup
+	eventWg        sync.WaitGroup
+	flowWg         sync.WaitGroup
 }
 
 type activeRoute struct {
 	eng *engineTun
 	at  int64
+}
+
+// Pool pointers, not slice headers: returning a slice to sync.Pool boxes it
+// in a heap object on the packet hot path.
+type routerPacket struct {
+	buf [routerBufSize]byte
+	end int
 }
 
 // engineTun is the tun.Device presented to one cryptographic engine. For the
@@ -63,11 +82,13 @@ type activeRoute struct {
 type engineTun struct {
 	router     *packetRouter
 	authSource netip.Addr
-	packets    chan []byte
+	packets    chan *routerPacket
 	events     chan tun.Event
 	closed     chan struct{}
 	mu         sync.Mutex
 	closedFlag bool
+	queueDrops atomic.Uint64
+	recovery   atomic.Pointer[awgrepair.Device] // AWG engines only; admission consults it on overflow
 }
 
 // newPacketRouter creates a router around the shared inner TUN. Peer traffic
@@ -83,8 +104,9 @@ func newPacketRouter(inner tun.Device, isKernel bool, policy *policySnapshot) *p
 		closed:   make(chan struct{}),
 	}
 	r.pool.New = func() interface{} {
-		return make([]byte, routerBufSize)
+		return new(routerPacket)
 	}
+	r.writeBatchPool.New = func() any { return new([conn.IdealBatchSize][]byte) }
 	r.awg = r.newEngine(netip.Addr{})
 	r.wg = r.newEngine(netip.Addr{})
 
@@ -111,12 +133,19 @@ func (r *packetRouter) engineForMode(mode string) *engineTun {
 	return e
 }
 
+// Snapshot the five AWG engines without retaining the route lock during peer reload.
+func (r *packetRouter) awgEngines() [5]*engineTun {
+	r.routesMu.RLock()
+	defer r.routesMu.RUnlock()
+	return [5]*engineTun{r.awg, r.engines[config.ModeExtTCP], r.engines[config.ModeExtUTP], r.engines[config.ModeReqTCP], r.engines[config.ModeReqUTP]}
+}
+
 // newEngine creates a queue. For TLS, authSource pins the enrolled IP.
 func (r *packetRouter) newEngine(authSource netip.Addr) *engineTun {
 	e := &engineTun{
 		router:     r,
 		authSource: authSource,
-		packets:    make(chan []byte, 256),
+		packets:    make(chan *routerPacket, 256),
 		events:     make(chan tun.Event, 8),
 		closed:     make(chan struct{}),
 	}
@@ -169,7 +198,9 @@ func (r *packetRouter) flowCleanupLoop() {
 
 func (r *packetRouter) remember(ip netip.Addr, e *engineTun, now int64) {
 	r.routesMu.Lock()
-	r.routes[ip] = activeRoute{eng: e, at: now}
+	if current, ok := r.routes[ip]; !ok || now > current.at {
+		r.routes[ip] = activeRoute{eng: e, at: now}
+	}
 	r.routesMu.Unlock()
 }
 
@@ -185,12 +216,7 @@ func (r *packetRouter) observeHandshake(raw, key string, e *engineTun, at time.T
 	if err != nil || p.Bits() != 32 || !p.Addr().Is4() || !r.policy.handshake(p.Addr(), key, at) {
 		return
 	}
-	when := at.UnixNano()
-	r.routesMu.Lock()
-	if when > r.routes[p.Addr()].at {
-		r.routes[p.Addr()] = activeRoute{eng: e, at: when}
-	}
-	r.routesMu.Unlock()
+	r.remember(p.Addr(), e, at.UnixNano())
 }
 
 // forget unconditionally drops the route and all pinned flows for ip, used
@@ -213,24 +239,33 @@ func (r *packetRouter) dispatchLoop() {
 		batch = 1
 	}
 	bufs := make([][]byte, batch)
+	storage := make([]*routerPacket, batch)
 	sizes := make([]int, batch)
 	for i := range bufs {
-		bufs[i] = r.pool.Get().([]byte)
+		storage[i] = r.pool.Get().(*routerPacket)
+		bufs[i] = storage[i].buf[:]
 	}
 	defer func() {
-		for _, b := range bufs {
-			if b != nil {
-				r.pool.Put(b[:cap(b)])
-			}
+		for _, p := range storage {
+			r.pool.Put(p)
 		}
 	}()
 
+	var burstTimer *time.Timer // one reader; reused across all pressured batches
+	defer func() {
+		if burstTimer != nil {
+			burstTimer.Stop()
+		}
+	}()
 	for {
 		n, err := r.inner.Read(bufs, sizes, tunOffset)
-		if err != nil {
+		if err != nil && !errors.Is(err, tun.ErrTooManySegments) {
 			return
 		}
 		now := time.Now()
+		nativeYielded, carrierYielded := false, false
+		var burstDeadline <-chan time.Time
+		budgetSpent := false
 		for i := range n {
 			if sizes[i] < 1 || sizes[i] > len(bufs[i])-tunOffset {
 				continue
@@ -244,31 +279,69 @@ func (r *packetRouter) dispatchLoop() {
 			if !r.policy.downlink(src, dst, 0) {
 				continue
 			}
-			eng := r.lookupDestinationEngine(src, dst, packet, now)
+			eng := r.destinationEngine(dst, packet, now, true)
 			if eng == nil {
 				continue // unknown path: drop
 			}
-			if eng.enqueue(bufs[i][:tunOffset+sizes[i]]) {
-				bufs[i] = nil // ownership transferred
+			p := storage[i]
+			p.end = tunOffset + sizes[i]
+			accepted, full := eng.tryEnqueue(p)
+			// Carrier pressure cannot consume the original native WG/AWG retry.
+			yielded := &nativeYielded
+			if eng != r.wg && eng != r.awg {
+				yielded = &carrierYielded
 			}
-		}
-		for i := range bufs {
-			if bufs[i] == nil {
-				bufs[i] = r.pool.Get().([]byte)
+			if full && !*yielded && (eng == r.wg || eng == r.awg || eng.recovery.Load() != nil) {
+				*yielded = true
+				runtime.Gosched()
+				accepted, full = eng.tryEnqueue(p)
+			}
+			if full && !budgetSpent {
+				if repair := eng.recovery.Load(); repair != nil && repair.WideActive(dst, now) {
+					// Bound waiting across the whole TUN read, not per engine or peer.
+					if burstDeadline == nil {
+						if burstTimer == nil {
+							burstTimer = time.NewTimer(time.Millisecond)
+						} else {
+							burstTimer.Reset(time.Millisecond)
+						}
+						burstDeadline = burstTimer.C
+					}
+					accepted, full = eng.admitBurst(p, burstDeadline)
+					budgetSpent = full
+				}
+			}
+			if full {
+				eng.countQueueDrop()
+			}
+			if accepted {
+				storage[i] = r.pool.Get().(*routerPacket)
+				bufs[i] = storage[i].buf[:]
 			}
 		}
 	}
 }
 
-// lookupDestinationEngine selects the engine that should receive a packet
-// addressed to dst. Per-flow reverse routing takes precedence over the per-IP
-// primary route. The returned engine is nil when no path is known.
-func (r *packetRouter) lookupDestinationEngine(src, dst netip.Addr, packet []byte, now time.Time) *engineTun {
+// destinationEngine selects the recipient by reverse flow, then primary route.
+// On admission, the first fragment records that decision for the rest of the
+// datagram. Dequeue rechecks the recorded destination without changing it.
+func (r *packetRouter) destinationEngine(dst netip.Addr, packet []byte, now time.Time, admit bool) *engineTun {
 	if fragKey, ok := fragmentKeyFromPacket(packet); ok {
+		if admit && fragmentOffset(packet) == 0 {
+			eng := r.lookupFlowEngine(dst, packet, now)
+			if eng != nil {
+				r.flows.pinFragment(fragKey, eng)
+			}
+			return eng
+		}
 		if eng, ok := r.flows.lookupFragment(fragKey, now); ok {
 			return eng
 		}
 	}
+	return r.lookupFlowEngine(dst, packet, now)
+}
+
+func (r *packetRouter) lookupFlowEngine(dst netip.Addr, packet []byte, now time.Time) *engineTun {
 	if key, ok := flowKeyFromPacket(packet); ok {
 		if eng, ok := r.flows.lookup(key, now); ok {
 			return eng
@@ -326,89 +399,139 @@ func (e *engineTun) sendEvent(ev tun.Event) {
 
 // inject places a copy of packet into an engine's inbound queue.
 func (r *packetRouter) inject(e *engineTun, packet []byte) {
-	buf := r.pool.Get().([]byte)
-	n := copy(buf[tunOffset:], packet)
-	if !e.enqueue(buf[:tunOffset+n]) {
-		r.pool.Put(buf[:cap(buf)])
+	p := r.pool.Get().(*routerPacket)
+	p.end = tunOffset + copy(p.buf[tunOffset:], packet)
+	if !e.enqueue(p) {
+		r.pool.Put(p)
 	}
 }
 
-func (e *engineTun) enqueue(p []byte) bool {
+func (e *engineTun) enqueue(p *routerPacket) bool {
+	accepted, full := e.tryEnqueue(p)
+	if full {
+		e.countQueueDrop()
+	}
+	return accepted
+}
+
+func (e *engineTun) tryEnqueue(p *routerPacket) (accepted, full bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.closedFlag {
-		return false
+		return false, false
 	}
 	select {
 	case <-e.router.closed:
+		return false, false
 	case e.packets <- p:
-		return true
+		return true, false
 	default:
+		return false, true
 	}
-	return false
 }
 
-func (r *packetRouter) drainQueue(ch <-chan []byte) {
+// admitBurst waits only for the dispatcher's remaining batch budget. Native
+// queues are drained after the shared reader stops; packets is never closed.
+func (e *engineTun) admitBurst(p *routerPacket, deadline <-chan time.Time) (accepted, full bool) {
+	select {
+	case <-e.closed:
+	case <-e.router.closed:
+	case e.packets <- p:
+		return true, false
+	case <-deadline:
+		return false, true
+	}
+	return false, false
+}
+
+func (e *engineTun) countQueueDrop() {
+	if e.authSource.IsValid() {
+		e.router.tlsQueueDrops.Add(1)
+	} else {
+		e.queueDrops.Add(1)
+	}
+}
+
+func (r *packetRouter) drainQueue(ch <-chan *routerPacket) {
 	for {
 		select {
 		case p := <-ch:
-			r.pool.Put(p[:cap(p)])
+			r.pool.Put(p)
 		default:
 			return
 		}
 	}
 }
 
-// Read returns one queued packet for this engine. Packets are accepted if
-// this engine owns the destination according to either the per-flow reverse
-// route or the per-IP primary route. Client-to-client packets are rechecked
-// against the current policy so revocation takes effect even for packets
-// already queued.
+// Read waits for the first accepted packet, then drains any packets already
+// queued up to the engine's batch size. Recheck route ownership and policy on
+// each packet so routing changes and revocation also apply to queued packets.
 func (e *engineTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
-	if len(bufs) == 0 || len(sizes) < len(bufs) || len(bufs[0]) <= offset {
+	return e.read(bufs, sizes, offset, nil)
+}
+
+// ReadWithWake lets an outer control queue interrupt only the blocking first
+// packet wait. Once a packet is available, batch draining remains non-blocking.
+func (e *engineTun) ReadWithWake(bufs [][]byte, sizes []int, offset int, wake <-chan struct{}) (int, error) {
+	return e.read(bufs, sizes, offset, wake)
+}
+
+func (e *engineTun) read(bufs [][]byte, sizes []int, offset int, wake <-chan struct{}) (int, error) {
+	if len(bufs) == 0 || len(sizes) < len(bufs) || offset < 0 || len(bufs[0]) <= offset {
 		return 0, errShortBuffer
 	}
-	for {
-		select {
-		case <-e.closed:
-			return 0, net.ErrClosed
-		case <-e.router.closed:
-			return 0, net.ErrClosed
-		case p := <-e.packets:
-			if len(p) <= tunOffset {
-				e.router.pool.Put(p[:cap(p)])
-				continue
+	limit := min(len(bufs), e.BatchSize())
+	n := 0
+	var now time.Time
+	for n < limit {
+		var p *routerPacket
+		if n == 0 {
+			select {
+			case <-e.closed:
+				return 0, net.ErrClosed
+			case <-e.router.closed:
+				return 0, net.ErrClosed
+			case <-wake:
+				return 0, nil
+			case p = <-e.packets:
 			}
-			packet := p[tunOffset:]
-			if len(packet) > len(bufs[0])-offset {
-				e.router.pool.Put(p[:cap(p)])
-				return 0, errShortBuffer
+		} else {
+			select {
+			case <-e.closed:
+				return n, net.ErrClosed
+			case <-e.router.closed:
+				return n, net.ErrClosed
+			case p = <-e.packets:
+			default:
+				return n, nil
 			}
-			src, srcOK := ipv4Src(packet)
-			dst, dstOK := ipv4Dst(packet)
-			if !srcOK || !dstOK {
-				e.router.pool.Put(p[:cap(p)])
-				continue
-			}
-			now := time.Now()
-			owner := e.router.lookupDestinationEngine(src, dst, packet, now)
-			if owner != e {
-				// Primary route may have moved; drop stale packet rather than
-				// deliver to the wrong engine. The sender will retry through
-				// the current owner.
-				e.router.pool.Put(p[:cap(p)])
-				continue
-			}
-			if !e.router.policy.downlink(src, dst, min(len(packet), len(bufs[0])-offset)) {
-				e.router.pool.Put(p[:cap(p)])
-				continue
-			}
-			n := copy(bufs[0][offset:], packet)
-			sizes[0] = n
-			e.router.pool.Put(p[:cap(p)])
-			return 1, nil
 		}
+		if p.end <= tunOffset {
+			e.router.pool.Put(p)
+			continue
+		}
+		packet := p.buf[tunOffset:p.end]
+		if len(packet) > len(bufs[n])-offset {
+			e.router.pool.Put(p)
+			return n, errShortBuffer
+		}
+		src, srcOK := ipv4Src(packet)
+		dst, dstOK := ipv4Dst(packet)
+		if n == 0 {
+			// Take the timestamp after the blocking receive, then reuse it
+			// for the rest of this non-blocking batch, as dispatchLoop does.
+			now = time.Now()
+		}
+		if !srcOK || !dstOK || e.router.destinationEngine(dst, packet, now, false) != e ||
+			!e.router.policy.downlink(src, dst, len(packet)) {
+			e.router.pool.Put(p)
+			continue
+		}
+		sizes[n] = copy(bufs[n][offset:], packet)
+		e.router.pool.Put(p)
+		n++
 	}
+	return n, nil
 }
 
 // Write receives decrypted packets from the engine, filters them, pins the
@@ -416,6 +539,8 @@ func (e *engineTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 // destination.
 func (e *engineTun) Write(bufs [][]byte, offset int) (int, error) {
 	var innerBufs [][]byte
+	var scratch *[conn.IdealBatchSize][]byte
+	r := e.router
 	now := time.Now()
 	for _, b := range bufs {
 		if len(b) < offset+ipv4.HeaderLen {
@@ -441,11 +566,20 @@ func (e *engineTun) Write(bufs [][]byte, offset int) (int, error) {
 			e.router.remember(src, e, now.UnixNano())
 		}
 		if e.router.policy.isGateway(dst) || direct {
+			if innerBufs == nil {
+				// Linux GRO may extend or reorder the slice headers.
+				if len(bufs) <= conn.IdealBatchSize {
+					scratch = e.router.writeBatchPool.Get().(*[conn.IdealBatchSize][]byte)
+					innerBufs = scratch[:0]
+				} else {
+					innerBufs = make([][]byte, 0, len(bufs))
+				}
+			}
 			innerBufs = append(innerBufs, b)
 			continue
 		}
 		if e.router.policy.isClient(dst) {
-			eng := e.router.lookupClientEngine(src, dst, packet, now)
+			eng := r.destinationEngine(dst, packet, now, true)
 			if eng == nil {
 				continue
 			}
@@ -454,48 +588,27 @@ func (e *engineTun) Write(bufs [][]byte, offset int) (int, error) {
 		}
 	}
 	if len(innerBufs) > 0 {
-		if _, err := e.router.inner.Write(innerBufs, offset); err != nil {
+		_, err := r.inner.Write(innerBufs, offset)
+		if scratch != nil {
+			clear(innerBufs)
+			r.writeBatchPool.Put(scratch)
+		}
+		if err != nil {
 			return 0, err
 		}
 	}
 	return len(bufs), nil
 }
 
-// pinReverseFlow records that return traffic for packet belongs to this
-// engine. For fragmented packets the IP ID is also pinned so all fragments
-// follow the same path.
-// It reports a hub service flow, which already has a return path and must
-// not let periodic health/control requests change unrelated routes.
+// pinReverseFlow records the sender's engine for reply traffic. It reports a
+// hub service flow, which must not let health/control requests change
+// unrelated routes.
 func (e *engineTun) pinReverseFlow(packet []byte, now time.Time) (service bool) {
 	if key, ok := flowKeyFromPacket(packet); ok {
 		e.router.flows.pin(key.reverse(), e, now)
-		service = key.proto == 6 && (key.b == tunneldns.Port || key.b == mesh.ControlPort || key.b == mesh.RelayPort)
-	}
-	if fragKey, ok := fragmentKeyFromPacket(packet); ok {
-		e.router.flows.pinFragment(fragKey, e)
+		service = key.proto == 6 && (key.b == tunneldns.Port || key.b == mesh.ControlPort || key.b == mesh.RelayPort || key.b == hubrelay.Port)
 	}
 	return service
-}
-
-// lookupClientEngine selects the engine that should receive a
-// client-to-client packet addressed to dst. Per-flow routing takes precedence
-// (the destination may have initiated to the source), falling back to the
-// destination's current primary route.
-func (r *packetRouter) lookupClientEngine(src, dst netip.Addr, packet []byte, now time.Time) *engineTun {
-	if fragKey, ok := fragmentKeyFromPacket(packet); ok {
-		if eng, ok := r.flows.lookupFragment(fragKey, now); ok {
-			return eng
-		}
-	}
-	if key, ok := flowKeyFromPacket(packet); ok {
-		if eng, ok := r.flows.lookup(key, now); ok {
-			return eng
-		}
-	}
-	if eng, ok := r.lookup(dst); ok {
-		return eng
-	}
-	return nil
 }
 
 // Close shuts down this engine's virtual view. It closes the engine's event
@@ -522,4 +635,9 @@ func (e *engineTun) MTU() (int, error)        { return e.router.inner.MTU() }
 func (e *engineTun) Name() (string, error)    { return e.router.inner.Name() }
 func (e *engineTun) Events() <-chan tun.Event { return e.events }
 func (e *engineTun) File() *os.File           { return e.router.inner.File() }
-func (e *engineTun) BatchSize() int           { return 1 }
+func (e *engineTun) BatchSize() int {
+	if e == e.router.awg || e == e.router.wg || e.recovery.Load() != nil {
+		return nativeBatchSize
+	}
+	return 1
+}

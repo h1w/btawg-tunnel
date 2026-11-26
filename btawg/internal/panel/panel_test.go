@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"bittorrent-tunnel/btawg/internal/awgrepair"
 	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/server"
 	"bittorrent-tunnel/btawg/internal/store"
@@ -19,12 +20,13 @@ import (
 
 type fakeRegistry struct {
 	*store.Store
-	registered   []store.ClientRecord
-	revoked      []store.ClientRecord
-	reloadCalls  int
-	reloadErr    error
-	activeConfig config.ServerConfig
-	managed      bool
+	registered       []store.ClientRecord
+	revoked          []store.ClientRecord
+	reloadCalls      int
+	reloadErr        error
+	activeConfig     config.ServerConfig
+	managed          bool
+	engineQueueDrops map[string]uint64
 }
 
 func (f *fakeRegistry) RegisterClient(rec store.ClientRecord) error {
@@ -55,6 +57,9 @@ func (f *fakeRegistry) Traffic() map[string]store.Traffic { return nil }
 func (f *fakeRegistry) InfoHash() string                  { return "aabbccddeeff00112233445566778899aabbccdd" }
 func (f *fakeRegistry) PubKey() string                    { return "11223344556677889900aabbccddeeff00112233" }
 func (f *fakeRegistry) TLSServerKey() string              { return "" }
+
+func (f *fakeRegistry) EngineQueueDrops() map[string]uint64 { return f.engineQueueDrops }
+func (f *fakeRegistry) AWGRepairStats() awgrepair.Stats     { return awgrepair.Stats{} }
 
 func importParse(raw string) (config.ClientConfig, error) {
 	return config.ParseImportString(raw)
@@ -366,7 +371,7 @@ func parseImportForTest(t *testing.T, st *store.Store, raw string) (any, error) 
 	if cfg.InfoHash != fakeInfoHash || cfg.ServerPubKey != fakePubKey {
 		t.Fatal("import does not carry the hub identity")
 	}
-	if cfg.Version != 1 {
+	if cfg.Version != config.ClientVersion {
 		t.Fatal("import version")
 	}
 	return cfg, nil

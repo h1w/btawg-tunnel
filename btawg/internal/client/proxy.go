@@ -2,13 +2,16 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
+	"syscall"
 	"time"
 
 	"bittorrent-tunnel/btawg/internal/config"
+	"bittorrent-tunnel/btawg/internal/hubrelay"
 	"bittorrent-tunnel/btawg/internal/socks"
 	"bittorrent-tunnel/btawg/internal/tunneldns"
 )
@@ -74,7 +77,7 @@ func (c *Client) localProxy() *socks.Server {
 		}
 		var lastErr error
 		for _, ip := range ips {
-			conn, err := c.proxyTCP(ctx, netip.AddrPortFrom(ip, uint16(port)))
+			conn, err := c.dialSOCKSData(ctx, gateway, netip.AddrPortFrom(ip, uint16(port)))
 			if err == nil {
 				return conn, nil
 			}
@@ -102,4 +105,24 @@ func (c *Client) localProxy() *socks.Server {
 		}
 		return ips[0], nil
 	})
+}
+
+func (c *Client) dialSOCKSData(ctx context.Context, gateway netip.Addr, dst netip.AddrPort) (net.Conn, error) {
+	if c.nativeSOCKS == nil {
+		return c.proxyTCP(ctx, dst)
+	}
+	conn, err := c.nativeSOCKS(ctx, netip.AddrPortFrom(gateway, hubrelay.Port))
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		// Older hubs and overlay-only hubs have no TCP relay listener.
+		// Once a relay accepts the socket, its decisions are authoritative.
+		return c.nativeSOCKS(ctx, dst)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := hubrelay.Request(ctx, conn, dst); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return conn, nil
 }

@@ -166,3 +166,93 @@ func TestSharedTUNReadErrors(t *testing.T) {
 		t.Fatal("path reader blocked after fatal shared device error")
 	}
 }
+
+func TestSharedTUNCountsOnlyFullPathDrops(t *testing.T) {
+	d := &faultTUN{fault: make(chan error, pathQueueSize+3), events: make(chan tun.Event)}
+	s := newSharedTUN(d, "test", config.DefaultMTU)
+	defer s.close()
+	p := s.newPath()
+	defer p.Close()
+	s.primary.Store(p)
+	for range pathQueueSize + 2 {
+		d.fault <- tun.ErrTooManySegments
+	}
+	d.fault <- os.ErrClosed
+	select {
+	case <-s.done:
+	case <-time.After(time.Second):
+		t.Fatal("a full path blocked the shared TUN dispatcher")
+	}
+	if got := s.tunQueueDrops.Load(); got != 2 {
+		t.Fatalf("full-path drops = %d, want 2", got)
+	}
+}
+
+type fragmentInputTUN struct {
+	faultTUN
+	input <-chan []byte
+}
+
+func (d *fragmentInputTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
+	p := <-d.input
+	if p == nil {
+		return 0, os.ErrClosed
+	}
+	sizes[0] = copy(bufs[0][offset:], p)
+	return 1, nil
+}
+
+func TestSharedTUNRejectsFragmentsAfterQueueDrop(t *testing.T) {
+	for _, dropFirst := range []bool{true, false} {
+		name := "middle"
+		if dropFirst {
+			name = "first"
+		}
+		t.Run(name, func(t *testing.T) {
+			input := make(chan []byte)
+			d := &fragmentInputTUN{faultTUN{fault: make(chan error), events: make(chan tun.Event)}, input}
+			s := newSharedTUN(d, "test", config.DefaultMTU)
+			defer s.close()
+			defer close(input)
+			p := s.newPath()
+			defer p.Close()
+			s.primary.Store(p)
+
+			fill := cap(p.packets)
+			if !dropFirst {
+				fill--
+			}
+			ordinary := ipv4FixtureFragment(0, 0, false, []byte("ordinary"))
+			for range fill {
+				input <- ordinary
+			}
+			input <- ipv4FixtureFragment(7, 0, true, []byte("abcdefgh"))
+			if !dropFirst {
+				input <- ipv4FixtureFragment(7, 8, true, []byte("ijklmnop"))
+			}
+			// Drop one queued packet to free a slot, after the fragment drop.
+			ready := ipv4FixtureFragment(42, 8, false, []byte("unknown"))
+			input <- ready
+			s.pool.Put(<-p.packets)
+			input <- ipv4FixtureFragment(7, 16, false, []byte("qrst"))
+			probe := ipv4FixtureFragment(8, 0, false, []byte("survives"))
+			input <- probe
+			input <- nil
+			<-s.done
+			if got := s.tunQueueDrops.Load(); got != 1 {
+				t.Errorf("queue drops = %d, want only the rejected fragment", got)
+			}
+			var last *[]byte
+			for len(p.packets) > 0 {
+				if last != nil {
+					s.pool.Put(last)
+				}
+				last = <-p.packets
+			}
+			if last == nil || string((*last)[packetHeadroom+20:]) != "survives" {
+				t.Fatal("unreassemblable tail took the freed slot from a complete datagram")
+			}
+			s.pool.Put(last)
+		})
+	}
+}

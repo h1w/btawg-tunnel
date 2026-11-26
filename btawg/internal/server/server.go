@@ -24,6 +24,7 @@ import (
 	utp "github.com/anacrolix/go-utp"
 
 	"bittorrent-tunnel/btawg/internal/awg"
+	"bittorrent-tunnel/btawg/internal/awgrepair"
 	"bittorrent-tunnel/btawg/internal/bind"
 	"bittorrent-tunnel/btawg/internal/carrier"
 	"bittorrent-tunnel/btawg/internal/config"
@@ -75,6 +76,7 @@ type Server struct {
 	policy *policySnapshot
 	panel  *panelListeners
 	mesh   *meshControl
+	egress map[*tcpEgressSession]struct{} // protected by applyMu
 
 	udpPC  net.PacketConn
 	sock   utp.Socket
@@ -283,16 +285,19 @@ func prepareServer(cfg config.ServerConfig, st *store.Store) (*Server, error) {
 }
 
 func (s *Server) finish() error {
-	// Native AWG and WG use dedicated UDP binds; each BitTorrent carrier mode
-	// gets its own AWG crypto engine on a stream-only bind so no native UDP
-	// socket is allocated per carrier mode.
-	s.dev = device.NewDevice(s.router.awg, bind.NewHybrid(), device.NewLogger(device.LogLevelError, "btawg-awg: "))
+	// Recovery is inside each AWG engine. WG and TLS-IP keep their original TUNs.
+	wrapAWG := func(e *engineTun, mode string) *awgrepair.Device {
+		r := awgrepair.NewHub(e, s.cfg.ServerPrivKey, mode)
+		e.recovery.Store(r)
+		return r
+	}
+	s.dev = device.NewDevice(wrapAWG(s.router.awg, config.ModeAWG), bind.NewHybrid(), device.NewLogger(device.LogLevelError, "btawg-awg: "))
 	s.wg = device.NewDevice(s.router.wg, conn.NewDefaultBind(), device.NewLogger(device.LogLevelError, "btawg-wg: "))
 	awgProfile := s.cfg.AWGProfile.DeviceIPC()
 	for _, mode := range []string{config.ModeExtUTP, config.ModeExtTCP, config.ModeReqUTP, config.ModeReqTCP} {
 		eng := s.router.engineForMode(mode)
 		b := bind.New()
-		d := device.NewDevice(eng, b, device.NewLogger(device.LogLevelError, "btawg-"+mode+": "))
+		d := device.NewDevice(wrapAWG(eng, mode), b, device.NewLogger(device.LogLevelError, "btawg-"+mode+": "))
 		if err := d.IpcSet(fmt.Sprintf("private_key=%s\nlisten_port=%d\n%s", s.cfg.ServerPrivKey, s.cfg.AWGPort, awgProfile)); err != nil {
 			return fmt.Errorf("configure %s device: %w", mode, err)
 		}
@@ -403,10 +408,12 @@ func (s *Server) ReloadPolicy() error {
 // reloadPolicy requires applyMu.
 func (s *Server) reloadPolicy() (err error) {
 	defer func() {
+		defer s.revalidateTCPEgress()
 		if err == nil {
 			return
 		}
 		s.policy.disableClients()
+		_ = s.setRecoveryPeers(nil) // No recovery control or queued repair survives a failed reload.
 		s.mu.Lock()
 		for _, t := range s.tlsSessions {
 			t.Close()
@@ -474,7 +481,7 @@ func (s *Server) Run(ctx context.Context) error {
 		{accept: s.tcpLn.Accept, proto: "tcp"},
 		{accept: s.sock.Accept, proto: "utp"},
 	}
-	errs := make(chan error, len(listeners)+4)
+	errs := make(chan error, len(listeners)+5)
 	if s.dnsLn != nil {
 		go func() { errs <- tunneldns.Serve(runCtx, s.dnsLn, s.policy.allowDNS) }()
 	}
@@ -487,6 +494,9 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	s.meshWG.Go(func() { errs <- s.serveMesh(runCtx) })
 	s.meshWG.Go(func() { errs <- s.serveRouteRelay(runCtx) })
+	if s.kernel != nil {
+		s.meshWG.Go(func() { errs <- s.serveTCPEgress(runCtx) })
+	}
 	s.meshWG.Go(func() { errs <- direct.ServeObserver(runCtx, s.sock) })
 	s.mu.Unlock()
 	defer func() { cancel(); s.meshWG.Wait() }()
@@ -792,6 +802,29 @@ func (s *Server) reloadPeers() error {
 			return err
 		}
 	}
+	// Retire old session keys (including queued repairs) before assigning a
+	// vacated /32 to a replacement peer on any cryptographic engine.
+	if s.router != nil {
+		groups, err := s.st.ListGroups()
+		if err != nil {
+			return err
+		}
+		gateways := make(map[string]netip.Addr, len(groups))
+		for _, g := range groups {
+			gateways[g.ID] = netip.MustParseAddr(g.ServerIP)
+		}
+		peers := make([]awgrepair.Peer, 0, len(next))
+		for _, r := range next {
+			group := r.GroupID
+			if group == "" {
+				group = store.DefaultGroupID
+			}
+			peers = append(peers, awgrepair.Peer{Local: gateways[group], Remote: netip.MustParseAddr(r.IP), Public: r.PubKey})
+		}
+		if err := s.setRecoveryPeers(peers); err != nil {
+			return err
+		}
+	}
 	for id, r := range next {
 		if old, ok := s.peers[id]; ok && old.IP == r.IP && old.PubKey == r.PubKey {
 			continue
@@ -802,6 +835,22 @@ func (s *Server) reloadPeers() error {
 		}
 	}
 	s.peers = next
+	return nil
+}
+
+func (s *Server) setRecoveryPeers(peers []awgrepair.Peer) error {
+	if s.router != nil {
+		for _, engine := range s.router.awgEngines() {
+			if engine == nil {
+				continue
+			}
+			if recovery := engine.recovery.Load(); recovery != nil {
+				if err := recovery.SetPeers(peers); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 

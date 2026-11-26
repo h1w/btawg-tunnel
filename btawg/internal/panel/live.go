@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"bittorrent-tunnel/btawg/internal/awgrepair"
 	"bittorrent-tunnel/btawg/internal/store"
 )
 
@@ -42,9 +43,11 @@ func (p *Panel) liveStats(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	traffic := p.reg.Traffic()
 	data := struct {
-		At      int64                 `json:"at"`
-		Clients map[string]liveClient `json:"clients"`
-	}{now.UnixMilli(), make(map[string]liveClient, len(clients))}
+		At               int64                 `json:"at"`
+		Clients          map[string]liveClient `json:"clients"`
+		EngineQueueDrops map[string]uint64     `json:"engine_queue_drops"`
+		AWGRecovery      awgrepair.Stats       `json:"awg_recovery"`
+	}{At: now.UnixMilli(), Clients: make(map[string]liveClient, len(clients)), EngineQueueDrops: p.reg.EngineQueueDrops(), AWGRecovery: p.reg.AWGRepairStats()}
 	for id, revoked := range clients {
 		data.Clients[id] = clientLive(revoked, traffic[id], now)
 	}

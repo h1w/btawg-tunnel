@@ -56,24 +56,26 @@ type fragmentKey struct {
 // active flows are not rewired when handshakes or route preferences change.
 //
 // Capacity semantics: the table holds at most maxEntries flows and maxEntries
-// fragment IDs. When a new pin would exceed capacity the oldest entry is
-// evicted. Stale entries are removed lazily on lookup and periodically by
-// cleanup. An entry is stale when it has not been hit for flowTTL.
+// fragment IDs. A new flow evicts the least recently used flow at capacity;
+// fragments are evicted in insertion order. Flow expiry is measured from
+// the last authenticated pin, not from reads of the reverse route.
 type flowTable struct {
 	mu sync.RWMutex
 
 	maxEntries int
 	flowTTL    time.Duration
 
-	flows    map[flowKey]flowEntry
-	frags    map[fragmentKey]*engineTun
-	lru      []flowKey // oldest first, updated on hit
-	lruFrags []fragmentKey
+	flows          map[flowKey]*flowEntry
+	frags          map[fragmentKey]*engineTun
+	oldest, newest *flowEntry
+	lruFrags       []fragmentKey
 }
 
 type flowEntry struct {
-	eng *engineTun
-	at  time.Time
+	key        flowKey
+	eng        *engineTun
+	at         time.Time
+	prev, next *flowEntry
 }
 
 const (
@@ -85,7 +87,7 @@ func newFlowTable() *flowTable {
 	return &flowTable{
 		maxEntries: defaultFlowMaxEntries,
 		flowTTL:    defaultFlowTTL,
-		flows:      make(map[flowKey]flowEntry),
+		flows:      make(map[flowKey]*flowEntry),
 		frags:      make(map[fragmentKey]*engineTun),
 	}
 }
@@ -99,48 +101,43 @@ func (t *flowTable) pin(key flowKey, eng *engineTun, now time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if entry, ok := t.flows[key]; ok {
+	entry := t.flows[key]
+	if entry != nil {
 		if entry.eng != eng && now.Sub(entry.at) <= t.flowTTL {
 			return
 		}
-	} else if len(t.flows) >= t.maxEntries {
-		t.evictOneLocked()
+	} else {
+		if len(t.flows) >= t.maxEntries {
+			entry = t.oldest
+			t.removeFlowLocked(entry)
+		} else {
+			entry = new(flowEntry)
+		}
+		entry.key = key
+		t.flows[key] = entry
 	}
-	t.flows[key] = flowEntry{eng: eng, at: now}
-	t.touchLocked(key)
+	entry.eng, entry.at = eng, now
+	t.touchLocked(entry)
 }
 
 // lookup returns the engine pinned for key, or nil/false for a miss.
 func (t *flowTable) lookup(key flowKey, now time.Time) (*engineTun, bool) {
-	t.mu.RLock()
-	entry, ok := t.flows[key]
-	if !ok {
-		t.mu.RUnlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	entry := t.flows[key]
+	if entry == nil {
 		return nil, false
 	}
 	if now.Sub(entry.at) > t.flowTTL {
-		t.mu.RUnlock()
-		t.mu.Lock()
-		// Re-check under write lock.
-		if e, ok := t.flows[key]; ok && now.Sub(e.at) > t.flowTTL {
-			delete(t.flows, key)
-			t.removeFromLRULocked(key)
-		}
-		t.mu.Unlock()
+		t.removeFlowLocked(entry)
 		return nil, false
 	}
-	t.mu.RUnlock()
-	// Refresh LRU asynchronously; correctness does not depend on LRU order.
-	t.mu.Lock()
-	if _, still := t.flows[key]; still {
-		t.touchLocked(key)
-	}
-	t.mu.Unlock()
+	t.touchLocked(entry)
 	return entry.eng, true
 }
 
-// pinFragment records that all fragments of the identified datagram belong to
-// eng. It is called for the first fragment, which also pins the full flow.
+// pinFragment records the destination engine chosen for the first fragment.
+// The sender's engine is tracked separately by the reverse flow.
 func (t *flowTable) pinFragment(key fragmentKey, eng *engineTun) {
 	if !key.src.IsValid() || !key.dst.IsValid() {
 		return
@@ -169,10 +166,9 @@ func (t *flowTable) lookupFragment(key fragmentKey, now time.Time) (*engineTun, 
 func (t *flowTable) removeForIP(ip netip.Addr) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	for k := range t.flows {
+	for k, entry := range t.flows {
 		if k.src == ip || k.dst == ip {
-			delete(t.flows, k)
-			t.removeFromLRULocked(k)
+			t.removeFlowLocked(entry)
 		}
 	}
 	for k := range t.frags {
@@ -188,10 +184,9 @@ func (t *flowTable) removeForIP(ip netip.Addr) {
 func (t *flowTable) removeForEngine(eng *engineTun) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	for k, e := range t.flows {
+	for _, e := range t.flows {
 		if e.eng == eng {
-			delete(t.flows, k)
-			t.removeFromLRULocked(k)
+			t.removeFlowLocked(e)
 		}
 	}
 	for k, e := range t.frags {
@@ -207,36 +202,46 @@ func (t *flowTable) removeForEngine(eng *engineTun) {
 func (t *flowTable) cleanup(now time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	for k, e := range t.flows {
+	for _, e := range t.flows {
 		if now.Sub(e.at) > t.flowTTL {
-			delete(t.flows, k)
-			t.removeFromLRULocked(k)
+			t.removeFlowLocked(e)
 		}
 	}
 	// Fragment entries do not track time; they are evicted by capacity or
 	// when the flow TTL is enforced lazily through the owning flow entry.
 }
 
-func (t *flowTable) touchLocked(key flowKey) {
-	for i, k := range t.lru {
-		if k == key {
-			copy(t.lru[i:], t.lru[i+1:])
-			t.lru[len(t.lru)-1] = key
-			return
-		}
+func (t *flowTable) touchLocked(e *flowEntry) {
+	if e == t.newest {
+		return
 	}
-	t.lru = append(t.lru, key)
+	t.unlinkLocked(e)
+	e.prev = t.newest
+	if t.newest != nil {
+		t.newest.next = e
+	} else {
+		t.oldest = e
+	}
+	t.newest = e
 }
 
-func (t *flowTable) evictOneLocked() {
-	for len(t.lru) > 0 {
-		k := t.lru[0]
-		t.lru = t.lru[1:]
-		if _, ok := t.flows[k]; ok {
-			delete(t.flows, k)
-			return
-		}
+func (t *flowTable) unlinkLocked(e *flowEntry) {
+	if e.prev != nil {
+		e.prev.next = e.next
+	} else if t.oldest == e {
+		t.oldest = e.next
 	}
+	if e.next != nil {
+		e.next.prev = e.prev
+	} else if t.newest == e {
+		t.newest = e.prev
+	}
+	e.prev, e.next = nil, nil
+}
+
+func (t *flowTable) removeFlowLocked(e *flowEntry) {
+	t.unlinkLocked(e)
+	delete(t.flows, e.key)
 }
 
 func (t *flowTable) evictOneFragmentLocked() {
@@ -248,16 +253,6 @@ func (t *flowTable) evictOneFragmentLocked() {
 			return
 		}
 	}
-}
-
-func (t *flowTable) removeFromLRULocked(key flowKey) {
-	nf := t.lru[:0]
-	for _, k := range t.lru {
-		if k != key {
-			nf = append(nf, k)
-		}
-	}
-	t.lru = nf
 }
 
 func (t *flowTable) removeFragmentFromLRULocked(key fragmentKey) {

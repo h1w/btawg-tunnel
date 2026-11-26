@@ -209,6 +209,33 @@ func TestFlowCapacityEviction(t *testing.T) {
 	}
 }
 
+func TestFlowLookupRefreshesEvictionOrderNotPinLifetime(t *testing.T) {
+	ft := newFlowTable()
+	ft.maxEntries = 2
+	owner := &engineTun{}
+	now := time.Now()
+	key := func(port uint16) flowKey {
+		k, _ := flowKeyFromPacket(makeTCPPacket("1.1.1.1", "10.77.0.2", 443, port))
+		return k
+	}
+	a, b, c := key(1000), key(1001), key(1002)
+	ft.pin(a, owner, now)
+	ft.pin(b, owner, now)
+	if got, ok := ft.lookup(a, now.Add(ft.flowTTL/2)); !ok || got != owner {
+		t.Fatal("live flow did not resolve to its owner")
+	}
+	ft.pin(c, owner, now.Add(ft.flowTTL/2))
+	if _, ok := ft.lookup(b, now.Add(ft.flowTTL/2)); ok {
+		t.Fatal("least recently used flow survived eviction")
+	}
+	if got, ok := ft.lookup(a, now.Add(ft.flowTTL/2)); !ok || got != owner {
+		t.Fatal("recently used flow was evicted")
+	}
+	if _, ok := ft.lookup(a, now.Add(ft.flowTTL+time.Nanosecond)); ok {
+		t.Fatal("lookup extended the authenticated pin lifetime")
+	}
+}
+
 func TestFlowStaleCleanup(t *testing.T) {
 	ft := newFlowTable()
 	ft.flowTTL = time.Millisecond

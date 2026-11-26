@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"bittorrent-tunnel/btawg/internal/awg"
+	"bittorrent-tunnel/btawg/internal/awgrepair"
 	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/store"
 )
@@ -33,6 +34,8 @@ type Registry interface {
 	Config() config.ServerConfig
 	Managed() bool
 	Traffic() map[string]store.Traffic
+	EngineQueueDrops() map[string]uint64
+	AWGRepairStats() awgrepair.Stats
 	InfoHash() string
 	PubKey() string
 	TLSServerKey() string

@@ -2,6 +2,7 @@ package routeproxy
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 )
@@ -24,6 +25,15 @@ type boundConn struct {
 func (c *boundConn) Close() error {
 	c.stop()
 	return c.Conn.Close()
+}
+
+func (c *boundConn) CloseWrite() error { return closeWrite(c.Conn) }
+
+func closeWrite(c net.Conn) error {
+	if tcp, ok := c.(interface{ CloseWrite() error }); ok {
+		return tcp.CloseWrite()
+	}
+	return errors.ErrUnsupported
 }
 
 func (c *boundConn) ReadFrom(r io.Reader) (int64, error) { return io.Copy(c.Conn, r) }

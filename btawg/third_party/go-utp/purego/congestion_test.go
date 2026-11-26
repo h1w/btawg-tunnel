@@ -133,3 +133,62 @@ func TestPacedWindowRecoversOnlyWithLowQueueDelay(t *testing.T) {
 		})
 	}
 }
+
+func TestFastLossBackoffWaitsOneRTT(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		rtt  uint32
+		wait uint64
+	}{
+		{"unknown RTT", 0, 100},
+		{"short RTT", 30, 100},
+		{"WAN RTT", 200, 200},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			const firstLoss = 1000
+			c := newConn(&Socket{}, nil)
+			c.rtt = tt.rtt
+			c.maxWindow = 64 << 10
+			c.maybeDecayWin(firstLoss)
+			if c.maxWindow != 32<<10 {
+				t.Fatalf("first loss left window %d, want %d", c.maxWindow, 32<<10)
+			}
+			c.maybeDecayWin(firstLoss + tt.wait - 1)
+			if c.maxWindow != 32<<10 {
+				t.Fatalf("another loss before the next round reduced window to %d", c.maxWindow)
+			}
+			c.maybeDecayWin(firstLoss + tt.wait)
+			if c.maxWindow != 16<<10 {
+				t.Fatalf("loss in the next round left window %d, want %d", c.maxWindow, 16<<10)
+			}
+		})
+	}
+}
+
+func TestCongestionBackoffKeepsOneSegmentSendable(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		peerWindow, want int
+	}{
+		{"peer has room", 4096, 1382},
+		{"peer window closed", 0, 0},
+		{"peer window too small", 500, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var wire retransmitTestWire
+			s := &Socket{pc: &wire, currentMS: 1000, optSndBuf: 8192}
+			c := newConn(s, nil)
+			c.state = csConnected
+			c.mtuFloor, c.mtuLast, c.mtuCeiling = 1402, 1402, 1402
+			c.mtuDiscoverTime = 60_000
+			c.maxWindow, c.maxWindowUser = 1382, tc.peerWindow
+			c.maybeDecayWin(s.currentMS)
+			if got := c.writeNoWait(make([]byte, 1382)); got != tc.want {
+				t.Fatalf("after backoff with no data in flight, Write queued %d bytes, want %d", got, tc.want)
+			}
+			if tc.want > 0 && len(wire.take(t).payload) != tc.want {
+				t.Fatal("segment was queued but not transmitted")
+			}
+		})
+	}
+}

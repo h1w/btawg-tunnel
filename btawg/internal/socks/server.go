@@ -160,28 +160,53 @@ func (s *Server) handleConnect(ctx context.Context, c net.Conn, dst target, obse
 	if err := writeReply(c, replySucceeded); err != nil {
 		return
 	}
-	if observe == nil {
-		done := make(chan struct{}, 2)
-		go func() { _, _ = io.Copy(upstream, c); done <- struct{}{} }()
-		go func() { _, _ = io.Copy(c, upstream); done <- struct{}{} }()
-		<-done
-		return
+	relayTCP(ctx, c, upstream, observe)
+}
+
+// RelayTCP copies both directions, propagates clean EOF as a write half-close,
+// and closes both sockets on an I/O error or cancellation.
+func RelayTCP(ctx context.Context, client, upstream net.Conn) {
+	relayTCP(ctx, client, upstream, nil)
+}
+
+func relayTCP(ctx context.Context, client, upstream net.Conn, observe func(bool, int64, time.Duration, time.Time)) {
+	closeBoth := func() {
+		_ = upstream.Close()
+		_ = client.Close()
 	}
-	done := make(chan struct{}, 2)
-	ctx, stopCopies := context.WithCancel(ctx)
-	defer stopCopies()
-	observeLive := func(up bool, n int64, duration time.Duration, at time.Time) {
-		if ctx.Err() == nil {
-			observe(up, n, duration, at)
+	stop := context.AfterFunc(ctx, closeBoth)
+	defer stop()
+	if observe != nil {
+		callback := observe
+		observe = func(up bool, n int64, duration time.Duration, at time.Time) {
+			if ctx.Err() == nil {
+				callback(up, n, duration, at)
+			}
 		}
 	}
-	go func() { copyObserved(upstream, c, true, observeLive); done <- struct{}{} }()
-	go func() { copyObserved(c, upstream, false, observeLive); done <- struct{}{} }()
-	// The first completed direction ends the session, as for unobserved flows.
+	copyOne := func(dst, src net.Conn, upload bool) {
+		var err error
+		if observe == nil {
+			_, err = io.Copy(dst, src)
+		} else {
+			err = copyObserved(dst, src, upload, observe)
+		}
+		if err == nil {
+			if tcp, ok := dst.(interface{ CloseWrite() error }); ok && tcp.CloseWrite() == nil {
+				return
+			}
+		}
+		// For connections without half-close, preserve the old full-close
+		// behavior rather than leave the opposite copy blocked indefinitely.
+		closeBoth()
+	}
+	done := make(chan struct{})
+	go func() { copyOne(upstream, client, true); close(done) }()
+	copyOne(client, upstream, false)
 	<-done
 }
 
-func copyObserved(dst io.Writer, src io.Reader, upload bool, observe func(bool, int64, time.Duration, time.Time)) {
+func copyObserved(dst io.Writer, src io.Reader, upload bool, observe func(bool, int64, time.Duration, time.Time)) error {
 	r := &transferReader{Reader: src, upload: upload}
 	w := &transferWriter{Writer: dst, reader: r}
 	n, err := io.Copy(w, r)
@@ -193,10 +218,11 @@ func copyObserved(dst io.Writer, src io.Reader, upload bool, observe func(bool, 
 		// A lone long gap is indistinguishable from an idle application;
 		// repeated stalls still contribute to a sustained download sample.
 		if !upload && r.maxGap > time.Second && duration < 2*r.maxGap {
-			return
+			return nil
 		}
 		observe(upload, n, duration, r.lastPayload)
 	}
+	return err
 }
 
 // Upload pauses may be application think time. Download gaps can instead be

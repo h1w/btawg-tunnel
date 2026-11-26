@@ -499,7 +499,7 @@ func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) {
 
 func (s *Socket) dispatch(b []byte, addr net.Addr, now uint64) {
 	if s.processPacket(b, addr, now) {
-		s.afterReceivingUtpMessage()
+		s.armAckTimer()
 	} else {
 		s.onReadNonUtp(b, addr)
 	}
@@ -507,7 +507,7 @@ func (s *Socket) dispatch(b []byte, addr net.Addr, now uint64) {
 
 // Arms the deferred ack timer. Acks are held back briefly so that a burst of packets produces one
 // ack, which is what libutp achieves by flushing after draining the socket.
-func (s *Socket) afterReceivingUtpMessage() {
+func (s *Socket) armAckTimer() {
 	if s.acksScheduled || len(s.ackConns) == 0 {
 		return
 	}
@@ -808,7 +808,6 @@ func (s *Socket) newOutgoingConn(addr net.Addr) *Conn {
 
 	c.retransmitTimeout = 3000
 	c.rtoTimeout = s.currentMS + uint64(c.retransmitTimeout)
-	c.lastRcvWin = c.rcvWindow()
 	// A random initial sequence number, so a blind attacker can't guess where the window is.
 	c.seqNr = uint16(rand.Uint32())
 
@@ -817,9 +816,8 @@ func (s *Socket) newOutgoingConn(addr net.Addr) *Conn {
 		Type:    stSyn,
 		Version: protocolVersion,
 		// SYNs are special: they carry the ID we want to receive on, not the one we send on.
-		ConnID:  c.connIDRecv,
-		WndSize: uint32(c.lastRcvWin),
-		SeqNr:   c.seqNr,
+		ConnID: c.connIDRecv,
+		SeqNr:  c.seqNr,
 	}
 	h.marshalTo(pkt.data)
 	c.outbuf.ensureSize(uint32(c.seqNr), uint32(c.curWindowPackets))

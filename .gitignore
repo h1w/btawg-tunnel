@@ -7,3 +7,13 @@
 /dist/
 /bin/
 btawg/bin/
+
+# Local capture sessions and extracted copies of archived speed runs
+/btawg-*-capture/
+/btawg-*-capture.tar.gz
+/btawg-carrier-lab.*/
+/windows11-screen.ppm
+/experiments/tunnel-speed/*/.archive.*/
+/experiments/tunnel-speed/*/.capture.*/
+/experiments/tunnel-speed/*/.replay.*/
+/experiments/tunnel-speed/*/.check.*/

@@ -8,7 +8,8 @@ import (
 )
 
 func TestLiveStatsRequireSessionAndExcludeSecrets(t *testing.T) {
-	srv, _, _ := newTestPanel(t)
+	srv, _, registry := newTestPanel(t)
+	registry.engineQueueDrops = map[string]uint64{"socks5-wg-udp": 7}
 	admin := login(t, srv.URL)
 	const endpoint = "/api/traffic"
 	visitor := &http.Client{CheckRedirect: admin.CheckRedirect}
@@ -39,10 +40,14 @@ func TestLiveStatsRequireSessionAndExcludeSecrets(t *testing.T) {
 		t.Fatalf("stats: %d, cache %q", r.StatusCode, r.Header.Get("Cache-Control"))
 	}
 	var data struct {
-		Clients map[string]map[string]json.RawMessage
+		Clients          map[string]map[string]json.RawMessage
+		EngineQueueDrops map[string]uint64 `json:"engine_queue_drops"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		t.Fatal(err)
+	}
+	if data.EngineQueueDrops["socks5-wg-udp"] != 7 {
+		t.Fatalf("unexpected engine drops: %v", data.EngineQueueDrops)
 	}
 	if len(data.Clients) != 1 {
 		t.Fatalf("stats users = %v", data.Clients)

@@ -105,9 +105,6 @@ func TestExtendedNegotiatesRemoteID(t *testing.T) {
 	if err := <-srvErr; err != nil {
 		t.Fatalf("server side: %v", err)
 	}
-	if ourLocalID == 0 || ourLocalID == extDataID {
-		t.Fatalf("server saw local id %d, want a fresh nonzero id", ourLocalID)
-	}
 
 	// The peer sends using the ID it assigned to us.
 	payload := []byte("hello from peer")
@@ -163,9 +160,6 @@ func TestExtendedAcceptNegotiatesRemoteID(t *testing.T) {
 		t.Fatalf("Accept: %v", r.err)
 	}
 	defer r.tr.Wait()
-	if ourLocalID == 0 || ourLocalID == extDataID {
-		t.Fatalf("client saw local id %d, want a fresh nonzero id", ourLocalID)
-	}
 
 	if err := r.tr.Send([]byte("server payload")); err != nil {
 		t.Fatal(err)

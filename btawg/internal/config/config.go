@@ -19,9 +19,10 @@ import (
 // ImportPrefix identifies a btawg client import string.
 const ImportPrefix = "btawg://"
 
-// ClientVersion is the only import-string format version accepted by
-// ParseImportString.
-const ClientVersion = 1
+// ClientVersion is the import-string format version accepted by the client
+// daemon. Subscription refresh replaces older saved imports without running
+// their legacy transports or parsing their retired format.
+const ClientVersion = 2
 
 // DefaultMTU is the default IP MTU of the hub and client tunnels.
 const DefaultMTU = 1280

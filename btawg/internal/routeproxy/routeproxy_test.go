@@ -443,9 +443,25 @@ func TestReadInvocationRejectsOversizedFieldsBeforeReadingBody(t *testing.T) {
 	}
 }
 
-func TestClosingTCPClientReleasesGrantEvenWithIdleDestination(t *testing.T) {
+func TestTCPHalfCloseKeepsGrantUntilResponseCompletes(t *testing.T) {
 	exit, local, wan := listenTCP(t), listenTCP(t), listenTCP(t)
 	released := make(chan struct{}, 1)
+	originResult := make(chan error, 1)
+	go func() {
+		c, err := wan.Accept()
+		if err != nil {
+			originResult <- err
+			return
+		}
+		defer c.Close()
+		_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+		if got, err := io.ReadAll(c); err != nil || string(got) != "request" {
+			originResult <- fmt.Errorf("WAN read = %q, %v", got, err)
+			return
+		}
+		_, err = c.Write([]byte("response"))
+		originResult <- err
+	}()
 	withinTest(t, func(ctx context.Context) error {
 		return serve(ctx, exit, authorizeTest("127.0.0.2", 0, Decision{
 			Life: ctx, Release: func() { released <- struct{}{} },
@@ -458,11 +474,24 @@ func TestClosingTCPClientReleasesGrantEvenWithIdleDestination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = c.Close()
+	defer c.Close()
+	_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+	if _, err := c.Write([]byte("request")); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.(*net.TCPConn).CloseWrite(); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := io.ReadAll(c); err != nil || string(got) != "response" {
+		t.Fatalf("routed response after CloseWrite = %q, %v", got, err)
+	}
+	if err := <-originResult; err != nil {
+		t.Fatal(err)
+	}
 	select {
 	case <-released:
 	case <-time.After(3 * time.Second):
-		t.Fatal("closed client kept an active grant to idle WAN destination")
+		t.Fatal("completed TCP stream kept an active grant")
 	}
 }
 

@@ -4,6 +4,36 @@
 
 - btawg vendor patch: synchronize timeout timer initialization with the callback
   to prevent a race during socket startup.
+- btawg vendor patch: selective acknowledgements for later packets no longer
+  postpone retransmission of the oldest unacknowledged packet.
+- btawg vendor patch: space fast-retransmit congestion-window cuts by at
+  least one smoothed RTT, retaining the 100 ms minimum interval.
+- btawg vendor patch: reverse DATA carrying a cumulative ACK no longer
+  cancels a deferred selective ACK when receive gaps are outstanding.
+- btawg vendor patch: arm the deferred ACK timer when reads reopen the
+  receive window, even when no inbound datagrams arrive.
+- btawg vendor patch: send the current receive window in queued DATA and
+  retransmissions instead of advertising obsolete credit.
+- btawg vendor patch: duplicate out-of-order DATA schedules another SACK
+  in case the previous acknowledgement was lost.
+- btawg vendor patch: congestion backoff leaves room for at least one
+  segment, while still honoring the peer receive window and send buffer.
+- btawg vendor patch: flush queued DATA on peer receive-window growth even
+  if the update does not acknowledge new data.
+- btawg vendor patch: refresh the socket clock before starting a new DATA
+  flight so idle time is not charged to its retransmission timeout.
+- btawg vendor patch: release the last queued short segment through the
+  normal send path so ACKs cannot bypass the peer receive window.
+- btawg vendor patch: wake blocked short writes when the next segment
+  fits, without waiting for an entire MTU of receive credit.
+- btawg vendor patch: start DATA retransmission timing on first send;
+  expiry cannot force previously unsent DATA through a closed receive window.
+- btawg vendor patch: record the transmitted packet's sequence for MTU
+  probes, including when reopening credit sends older queued DATA.
+- btawg vendor patch: confirm an MTU probe when either a cumulative or
+  selective ACK retires the transmitted packet.
+- btawg vendor patch: derive the first-flight RTO deadline from the
+  outgoing packet timestamp rather than an earlier socket clock sample.
 
 - Split out of [go-libutp](https://github.com/anacrolix/go-libutp), where these packages were added
   but never released. The `utp` package is now this module's root, so the import path is

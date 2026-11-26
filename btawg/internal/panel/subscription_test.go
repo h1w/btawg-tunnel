@@ -92,6 +92,9 @@ func TestSubscriptionLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatal("response is not a btawg import")
 		}
+		if cfg.Version != config.ClientVersion {
+			t.Fatalf("subscription import version = %d, want %d", cfg.Version, config.ClientVersion)
+		}
 		rec, err := st.GetClient(clientID)
 		if err != nil || !strings.HasPrefix(cfg.CarrierEndpoint, addr+":") || cfg.ClientPrivKey != rec.PrivKey || cfg.ClientIP != rec.IP {
 			t.Fatal("response does not match the active hub and enrolled client")

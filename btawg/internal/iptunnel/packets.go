@@ -2,6 +2,7 @@ package iptunnel
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 
 	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
@@ -22,7 +23,7 @@ func SendPackets(dev tun.Device, send func([]byte) error) error {
 	}
 	for {
 		n, err := dev.Read(bufs, sizes, tunHeadroom)
-		if err != nil {
+		if err != nil && !errors.Is(err, tun.ErrTooManySegments) {
 			return err
 		}
 		for i := range n {

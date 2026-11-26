@@ -61,6 +61,10 @@ func NewHub(name string) (*Hub, error) {
 	}, nil
 }
 
+// WAN returns the uplink used by this hub's forwarding policy.
+// Call under the same lock that protects Apply.
+func (h *Hub) WAN() string { return h.wan }
+
 // Apply assigns gateway addresses on the TUN, enables IPv4 forwarding, and
 // installs scoped NAT/forwarding rules.  Each prefix must be an IPv4 prefix
 // whose host bits identify the gateway address to assign.

@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"io"
 	"net"
 	"net/netip"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"bittorrent-tunnel/btawg/internal/mesh"
 	"bittorrent-tunnel/btawg/internal/routeproxy"
+	"bittorrent-tunnel/btawg/internal/socks"
 	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
@@ -112,15 +112,5 @@ func (s *Server) relayRoute(ctx context.Context, conn net.Conn) {
 	if conn.SetReadDeadline(time.Time{}) != nil {
 		return
 	}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		_, _ = io.Copy(dst, conn)
-		conn.Close()
-		dst.Close()
-	}()
-	_, _ = io.Copy(conn, dst)
-	dst.Close()
-	conn.Close()
-	<-done
+	socks.RelayTCP(ctx, conn, dst)
 }

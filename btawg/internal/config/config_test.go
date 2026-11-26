@@ -14,7 +14,7 @@ const testInfoHash = "0123456789abcdef0123456789abcdef01234567"
 
 func testClientConfig() ClientConfig {
 	return ClientConfig{
-		Version:       1,
+		Version:       ClientVersion,
 		InfoHash:      testInfoHash,
 		ServerPubKey:  "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
 		ClientPrivKey: "11223344556677889900aabbccddeeff0011223344556677889900aabbccdd00",
@@ -55,13 +55,25 @@ func TestImportRoundTrip(t *testing.T) {
 }
 
 func TestImportWithoutAWGProfileUsesLegacyDefaults(t *testing.T) {
-	const legacy = `{"version":1,"transport":"ext-tcp"}`
-	cfg, err := ParseImportString(ImportPrefix + base64.RawURLEncoding.EncodeToString([]byte(legacy)))
+	const minimal = `{"version":2,"transport":"ext-tcp"}`
+	cfg, err := ParseImportString(ImportPrefix + base64.RawURLEncoding.EncodeToString([]byte(minimal)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := cfg.Profile.DeviceIPC(); got != wantProfileString {
-		t.Fatalf("legacy AWG profile = %q, want %q", got, wantProfileString)
+		t.Fatalf("default AWG profile = %q, want %q", got, wantProfileString)
+	}
+}
+
+func TestParseRejectsLegacyVersion(t *testing.T) {
+	legacy := testClientConfig()
+	legacy.Version = 1
+	s, err := legacy.ImportString()
+	if err != nil {
+		t.Fatalf("ImportString: %v", err)
+	}
+	if _, err := ParseImportString(s); err == nil {
+		t.Fatal("ParseImportString accepted version 1, want error")
 	}
 }
 

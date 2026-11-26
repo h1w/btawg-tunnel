@@ -32,6 +32,12 @@ func publicIPv4(ip netip.Addr) bool {
 	return true
 }
 
+// CheckPublicTCPDestination rejects non-public addresses and addresses on
+// local interfaces or directly attached subnets before an Internet dial.
+func CheckPublicTCPDestination(ip netip.Addr) error {
+	return (exitPolicy{}).check([]netip.Addr{ip})
+}
+
 // Serve always uses the system resolver and interface list. Tests in this
 // package can use private sockets without exposing a policy bypass to callers.
 type exitPolicy struct {

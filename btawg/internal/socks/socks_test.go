@@ -98,6 +98,64 @@ func TestConnectRoundTrip(t *testing.T) {
 	}
 }
 
+func TestConnectPreservesResponseAfterHalfClose(t *testing.T) {
+	for _, observed := range []bool{false, true} {
+		name := "ordinary"
+		if observed {
+			name = "observed"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			origin, err := net.Listen("tcp4", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer origin.Close()
+			go func() {
+				c, err := origin.Accept()
+				if err != nil {
+					return
+				}
+				defer c.Close()
+				_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+				b, err := io.ReadAll(c)
+				if err == nil && string(b) == "request" {
+					_, _ = c.Write([]byte("response after EOF"))
+				}
+			}()
+			ln, err := net.Listen("tcp4", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ln.Close()
+			upstream := NewServer((&net.Dialer{}).DialContext, nil)
+			srv := upstream
+			if observed {
+				srv = NewObservedBalancer(func(bool) (*Server, context.Context, func(bool, int64, time.Duration, time.Time)) {
+					return upstream, ctx, func(bool, int64, time.Duration, time.Time) {}
+				})
+			}
+			go srv.Serve(ctx, ln)
+			conn, err := NewClient(ln.Addr().String()).Dial(ctx, "tcp", origin.Addr().String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close()
+			_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
+			if _, err := conn.Write([]byte("request")); err != nil {
+				t.Fatal(err)
+			}
+			if err := conn.(*net.TCPConn).CloseWrite(); err != nil {
+				t.Fatal(err)
+			}
+			if got, err := io.ReadAll(conn); err != nil || string(got) != "response after EOF" {
+				t.Fatalf("response after CloseWrite = %q, %v", got, err)
+			}
+		})
+	}
+}
+
 func TestObservedBalancerReportsCompletedTCPDirection(t *testing.T) {
 	echo := tcpEcho(t)
 	upstream := NewServer(func(ctx context.Context, network, addr string) (net.Conn, error) {

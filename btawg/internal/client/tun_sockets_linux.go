@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/tunsetup"
 )
 
@@ -20,14 +21,14 @@ func (p *tunPath) inboundPacket(packet []byte) []byte { return packet }
 
 // Register the bound source port before TCP connect can send its first SYN.
 // Binding explicitly without SO_REUSEADDR reserves the port for this socket.
-func (p *tunPath) bindTCP(ctx context.Context, network string, raw syscall.RawConn, source [4]byte, key *localPort) error {
+func (p *tunPath) bindTCP(ctx context.Context, network string, raw syscall.RawConn, source [4]byte, key *localPort, control func(string, string, syscall.RawConn) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if err := tunsetup.BindDevice(p.shared.name)(network, "", raw); err != nil {
 		return err
 	}
-	if err := tunsetup.OverlayTCP(network, "", raw); err != nil {
+	if err := control(network, "", raw); err != nil {
 		return err
 	}
 	var socketErr error
@@ -94,21 +95,31 @@ func (s *sharedTUN) pruneSockets() {
 }
 
 func (p *tunPath) proxySockets(c *Client, source netip.Addr) error {
-	c.proxyTCP = func(ctx context.Context, dst netip.AddrPort) (net.Conn, error) {
-		key := localPort{proto: unix.IPPROTO_TCP, remote: dst}
-		owner := &socketPath{path: p}
-		dialer := net.Dialer{ControlContext: func(ctx context.Context, network, _ string, raw syscall.RawConn) error {
-			if err := p.bindTCP(ctx, network, raw, source.As4(), &key); err != nil {
-				return err
+	makeDial := func(control func(string, string, syscall.RawConn) error, native bool) func(context.Context, netip.AddrPort) (net.Conn, error) {
+		return func(ctx context.Context, dst netip.AddrPort) (net.Conn, error) {
+			key := localPort{proto: unix.IPPROTO_TCP, remote: dst}
+			owner := &socketPath{path: p}
+			dialer := net.Dialer{ControlContext: func(ctx context.Context, network, _ string, raw syscall.RawConn) error {
+				if err := p.bindTCP(ctx, network, raw, source.As4(), &key, control); err != nil {
+					return err
+				}
+				return p.shared.track(key, owner)
+			}}
+			conn, err := dialer.DialContext(ctx, "tcp4", dst.String())
+			if err != nil {
+				p.shared.untrack(key, owner)
+				return nil, err
 			}
-			return p.shared.track(key, owner)
-		}}
-		conn, err := dialer.DialContext(ctx, "tcp4", dst.String())
-		if err != nil {
-			p.shared.untrack(key, owner)
-			return nil, err
+			tcp := conn.(*net.TCPConn)
+			if native {
+				tunsetup.TuneNativeUpload(tcp)
+			}
+			return &trackedTCP{TCPConn: tcp, shared: p.shared, key: key, owner: owner}, nil
 		}
-		return &trackedTCP{TCPConn: conn.(*net.TCPConn), shared: p.shared, key: key, owner: owner}, nil
+	}
+	c.proxyTCP = makeDial(tunsetup.OverlayTCP, false)
+	if config.IsNativeMode(c.cfg.Transport) {
+		c.nativeSOCKS = makeDial(tunsetup.NativeSOCKSTCP, true)
 	}
 	listen := net.ListenConfig{Control: tunsetup.BindDevice(p.shared.name)}
 	addr := netip.AddrPortFrom(source, 0).String()

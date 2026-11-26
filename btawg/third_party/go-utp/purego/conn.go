@@ -28,8 +28,8 @@ const (
 	duplicateAcksBeforeResend = 3
 	// A non-SYN packet acking more than this far past what we've sent is treated as spoofed.
 	ackNrAllowedWindow = duplicateAcksBeforeResend
-	// How long the window must have been left alone before it may be decayed again.
-	maxWindowDecay = 100 * time.Millisecond
+	// Minimum interval between loss cuts when RTT is unknown or shorter.
+	minWindowDecayInterval = 100 * time.Millisecond
 	// At WAN RTTs the packet cap can bite before the byte window. Keep both
 	// bounds well below half the wrapping 16-bit sequence space.
 	reorderBufferMaxSize  = 16384
@@ -156,6 +156,8 @@ type Conn struct {
 	curWindowPackets uint16
 	// Number of tail packets not yet examined since enqueue or timeout.
 	queuedPackets uint16
+	// The smallest segment requested since the last writer wakeup.
+	blockedWriteBytes int
 	// Bytes in flight. Packets not yet sent, and packets a timeout has written off, don't count.
 	curWindow       int
 	maxWindow       int
@@ -304,7 +306,7 @@ func (c *Conn) initialize(connIDRecv, connIDSend uint16) {
 	// Deliberately far in the future: there is no delay measurement to age until one arrives.
 	c.lastMeasuredDelay = currentMS + 0x70000000
 	c.averageSampleTime = currentMS + 5000
-	c.lastRwinDecay = currentMS - uint64(maxWindowDecay/time.Millisecond)
+	c.lastRwinDecay = currentMS - uint64(minWindowDecayInterval/time.Millisecond)
 	c.ourHist.clear(currentMS)
 	c.theirHist.clear(currentMS)
 	c.rttHist.clear(currentMS)
@@ -397,7 +399,10 @@ func (c *Conn) sendData(b []byte, dontFragment bool, now uint64) {
 	stampHeader(b, uint32(now), c.replyMicro)
 	c.lastSentPacket = c.s.currentMS
 	c.s.send(b, c.addr, dontFragment)
-	c.unscheduleAck()
+	// DATA piggybacks the cumulative ACK, but only STATE reports gaps.
+	if c.reorderCount == 0 || packetType(b[0]>>4) == stState {
+		c.unscheduleAck()
+	}
 }
 
 func (c *Conn) unscheduleAck() {
@@ -468,6 +473,8 @@ func (c *Conn) sendPacket(pkt *outgoingPacket) {
 	}
 	pkt.needResend = false
 	setHeaderAckNr(pkt.data, c.ackNr)
+	c.lastRcvWin = c.rcvWindow()
+	binary.BigEndian.PutUint32(pkt.data[12:16], uint32(c.lastRcvWin))
 	if tx := c.s.tx; tx != nil && tx.active {
 		if tx.stamp == 0 {
 			tx.stamp = nowMicros()
@@ -475,6 +482,11 @@ func (c *Conn) sendPacket(pkt *outgoingPacket) {
 		pkt.timeSent = tx.stamp
 	} else {
 		pkt.timeSent = nowMicros()
+	}
+	seq := headerSeqNr(pkt.data)
+	if pkt.transmissions == 0 && seq == c.seqNr-c.curWindowPackets {
+		c.retransmitTimeout = c.rto
+		c.rtoTimeout = pkt.timeSent/1000 + uint64(c.rto)
 	}
 
 	if c.mtuDiscoverTime < c.s.currentMS {
@@ -484,15 +496,14 @@ func (c *Conn) sendPacket(pkt *outgoingPacket) {
 	useAsMTUProbe := false
 	// Don't probe with packets larger than the ceiling: those have probably already failed as
 	// probes, and now need to be fragmented just to get through. Sequence number 0 is the magic
-	// "no probe" value, so a packet with sequence number 1 can't be probed with either.
+	// "no probe" value.
 	if c.mtuFloor < c.mtuCeiling &&
 		len(pkt.data) > c.mtuFloor &&
 		len(pkt.data) <= c.mtuCeiling &&
 		c.mtuProbeSeq == 0 &&
-		c.seqNr != 1 &&
+		seq != 0 &&
 		pkt.transmissions == 0 {
-		// seqNr has already been incremented past this packet.
-		c.mtuProbeSeq = (c.seqNr - 1) & ackNrMask
+		c.mtuProbeSeq = seq
 		c.mtuProbeSize = len(pkt.data)
 		useAsMTUProbe = true
 		c.s.logf(logMTU, "%v: MTU [PROBE] floor:%d ceiling:%d current:%d", c, c.mtuFloor, c.mtuCeiling, c.mtuProbeSize)
@@ -501,14 +512,9 @@ func (c *Conn) sendPacket(pkt *outgoingPacket) {
 	c.sendData(pkt.data, useAsMTUProbe, pkt.timeSent)
 }
 
-// Reports whether another bytes bytes may be put in flight. Pass -1 for a full packet.
+// Reports whether another segment may be put in flight.
 func (c *Conn) isFull(bytes int) bool {
-	ps := c.packetSize()
-	if bytes < 0 {
-		bytes = ps
-	} else if bytes > ps {
-		bytes = ps
-	}
+	bytes = min(bytes, c.packetSize())
 	// Leave one slot for the FIN. This is an enqueue limit, not a limit on
 	// sending packets already in the queue.
 	if int(c.curWindowPackets) >= outgoingBufferMaxSize-1 {
@@ -555,11 +561,6 @@ var MatrixDisableNagle bool
 // Queues payload for sending, appending to the last unsent packet where there's room, and flushes.
 // flags is stData or stFin.
 func (c *Conn) writeOutgoingPacket(payload []byte, flags packetType) {
-	// Start the retransmit timer if this is the first thing in the queue.
-	if c.curWindowPackets == 0 {
-		c.retransmitTimeout = c.rto
-		c.rtoTimeout = c.s.currentMS + uint64(c.retransmitTimeout)
-	}
 	ps := c.packetSize()
 	for {
 		added := 0
@@ -587,14 +588,11 @@ func (c *Conn) writeOutgoingPacket(payload []byte, flags packetType) {
 			payload = payload[added:]
 			pkt.payload += added
 		}
-		c.lastRcvWin = c.rcvWindow()
 		h := header{
 			Type:      flags,
 			Version:   protocolVersion,
 			Extension: extNone,
 			ConnID:    c.connIDSend,
-			WndSize:   uint32(c.lastRcvWin),
-			AckNr:     c.ackNr,
 		}
 		// A packet we filled up rather than created keeps the sequence number it was given when
 		// it was queued. Only a new packet takes the next one.
@@ -620,7 +618,10 @@ func (c *Conn) writeOutgoingPacket(payload []byte, flags packetType) {
 
 // Test whether enough time has passed to decay the window again.
 func (c *Conn) canDecayWin(currentMS uint64) bool {
-	return currentMS-c.lastRwinDecay >= uint64(maxWindowDecay/time.Millisecond)
+	// A flight can produce several SACKs with different holes. Cut at most
+	// once per RTT, but retransmit each eligible hole immediately.
+	interval := max(uint64(minWindowDecayInterval/time.Millisecond), uint64(c.rtt))
+	return currentMS-c.lastRwinDecay >= interval
 }
 
 func (c *Conn) maybeDecayWin(currentMS uint64) {
@@ -628,12 +629,9 @@ func (c *Conn) maybeDecayWin(currentMS uint64) {
 		return
 	}
 	// TCP uses 0.5 here too.
-	c.maxWindow /= 2
+	c.maxWindow = max(c.maxWindow/2, c.packetSize(), minWindowSize)
 	c.windowRemainder = 0
 	c.lastRwinDecay = currentMS
-	if c.maxWindow < minWindowSize {
-		c.maxWindow = minWindowSize
-	}
 	c.slowStart = false
 	c.ssthresh = c.maxWindow
 }
@@ -647,6 +645,11 @@ func (c *Conn) ackPacket(seq uint16, now uint64) int {
 	}
 	if pkt.transmissions == 0 {
 		return 2
+	}
+	if c.mtuProbeSeq != 0 && seq == c.mtuProbeSeq {
+		c.mtuFloor = c.mtuProbeSize
+		c.mtuSearchUpdate()
+		c.s.logf(logMTU, "%v: MTU [ACK] floor:%d ceiling:%d current:%d", c, c.mtuFloor, c.mtuCeiling, c.mtuLast)
 	}
 	c.outbuf.put(uint32(seq), nil)
 	// Only packets that went out exactly once produce a usable RTT sample: for anything resent
@@ -671,13 +674,17 @@ func (c *Conn) ackPacket(seq uint16, now uint64) int {
 		}
 		c.rto = max(c.rtt+c.rttVar*4, floor)
 	}
-	c.retransmitTimeout = c.rto
-	c.rtoTimeout = c.s.currentMS + uint64(c.rto)
+	// SACKs for later packets free window space but must not postpone
+	// retransmission of the oldest outstanding packet.
+	if seq == c.seqNr-c.curWindowPackets {
+		c.retransmitTimeout = c.rto
+		c.rtoTimeout = c.s.currentMS + uint64(c.rto)
+		c.retransmitCount = 0
+	}
 	// A packet a timeout has written off is no longer counted in the window.
 	if !pkt.needResend {
 		c.curWindow -= pkt.payload
 	}
-	c.retransmitCount = 0
 	return 0
 }
 
@@ -863,7 +870,7 @@ func (c *Conn) applyCControl(bytesAcked int, minRTT int64) {
 	} else {
 		c.maxWindow = ledbatCwnd
 	}
-	window := min(max(c.maxWindow, minWindowSize), c.optSndBuf)
+	window := min(max(c.maxWindow, c.packetSize(), minWindowSize), c.optSndBuf)
 	if c.s.paceBytesPerSecond > 0 && c.rttHist.initialized && ourDelay < int32(target/8) {
 		// Refill at most 90% of the paced bandwidth-delay product. Only
 		// do this when the queue is quiet; otherwise LEDBAT can back off.
@@ -888,6 +895,12 @@ func (c *Conn) checkTimeouts() {
 		return
 	}
 	currentMS := c.s.currentMS
+	if c.curWindowPackets > 0 {
+		if oldest := c.outbuf.get(uint32(c.seqNr - c.curWindowPackets)); oldest != nil && oldest.transmissions == 0 {
+			// Unsent data can wait for credit, but it cannot time out.
+			c.rtoTimeout = 0
+		}
+	}
 
 	// The peer advertised a zero window long enough ago that it's worth probing it again.
 	if currentMS >= c.zeroWindowTime && c.maxWindowUser == 0 {
@@ -977,10 +990,7 @@ func (c *Conn) checkTimeouts() {
 	}
 
 	// If the window grew, or in-flight bytes dropped below it, writers can go again.
-	if c.state == csConnectedFull && !c.isFull(-1) {
-		c.state = csConnected
-		c.cond.Broadcast()
-	}
+	c.wakeWriters()
 
 	if c.state >= csConnected && !c.finSent {
 		if currentMS-c.lastSentPacket >= uint64(keepAliveInterval/time.Millisecond) {
@@ -1083,11 +1093,6 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 			continue
 		}
 		ackedBytes += pkt.payload
-		if c.mtuProbeSeq != 0 && seq == c.mtuProbeSeq {
-			c.mtuFloor = c.mtuProbeSize
-			c.mtuSearchUpdate()
-			c.s.logf(logMTU, "%v: MTU [ACK] floor:%d ceiling:%d current:%d", c, c.mtuFloor, c.mtuCeiling, c.mtuLast)
-		}
 		if pkt.timeSent < now {
 			minRTT = min(minRTT, int64(now-pkt.timeSent))
 		} else {
@@ -1141,6 +1146,7 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 		c.applyCControl(ackedBytes, minRTT)
 	}
 
+	previousWindow := c.maxWindowUser
 	// The peer should never ack past what we've sent.
 	if acks <= int(c.curWindowPackets) {
 		c.maxWindowUser = int(p.h.WndSize)
@@ -1195,14 +1201,6 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 			c.curWindowPackets--
 		}
 
-		// Flush Nagle.
-		if c.curWindowPackets == 1 {
-			pkt := c.outbuf.get(uint32(c.seqNr - 1))
-			if pkt != nil && pkt.transmissions == 0 {
-				c.sendPacket(pkt)
-			}
-		}
-
 		if c.fastTimeout {
 			// If the fast resend pointer has moved past the oldest outstanding packet, we've
 			// already resent what timed out, so leave fast timeout mode.
@@ -1220,18 +1218,13 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 		c.selectiveAck((uint32(pkAckNr)+2)&ackNrMask, p.selAck, now)
 	}
 
-	// Acks free up window space, so send whatever the queue has been holding. libutp leaves this
-	// to the next application write or to the 500ms timer, which stalls a sender that has queued
-	// more than the window and then stopped writing.
-	if acks > 0 || p.selAck != nil {
+	// A standalone window update also frees credit without acknowledging
+	// a packet. Do not leave queued DATA waiting for the socket timer.
+	if acks > 0 || p.selAck != nil || c.maxWindowUser > previousWindow {
 		c.flushPackets()
 	}
 
-	// If the ack dropped in-flight bytes below the window, writers can go again.
-	if c.state == csConnectedFull && !c.isFull(-1) {
-		c.state = csConnected
-		c.cond.Broadcast()
-	}
+	c.wakeWriters()
 
 	if p.h.Type == stState {
 		// Nothing but an ack.
@@ -1302,7 +1295,8 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 		// buffer had aliased onto this slot.
 		c.inbuf.ensureSize(uint32(pkSeqNr)+1, seqNr+1)
 		if c.inbuf.get(uint32(pkSeqNr)) != nil {
-			// Duplicate.
+			// The peer may have retransmitted because our SACK was lost.
+			c.scheduleAck()
 			return
 		}
 		c.inbuf.put(uint32(pkSeqNr), &inboundPacket{data: append([]byte(nil), p.payload...)})
@@ -1410,6 +1404,9 @@ func (c *Conn) readDrained() {
 		c.sendAck(false)
 	} else {
 		c.scheduleAck()
+		// A nonzero window can still be too small for the next DATA packet.
+		// Arm the timer even if no more datagrams arrive to trigger it.
+		c.s.armAckTimer()
 	}
 }
 
@@ -1451,9 +1448,19 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	}
 }
 
+// A blocked writer may need less than one MTU of credit. Reopen writes as
+// soon as the smallest waiting segment fits; longer writes recheck admission.
+func (c *Conn) wakeWriters() {
+	if c.state == csConnectedFull && !c.isFull(c.blockedWriteBytes) {
+		c.state = csConnected
+		c.blockedWriteBytes = 0
+		c.cond.Broadcast()
+	}
+}
+
 // Queues as much of b as the window allows, and reports how much that was. Mirrors utp_writev.
 func (c *Conn) writeNoWait(b []byte) int {
-	if c.state != csConnected || c.finSent {
+	if c.finSent || (c.state != csConnected && c.state != csConnectedFull) {
 		return 0
 	}
 	if tx := c.s.tx; tx != nil && len(b) > c.packetSize() {
@@ -1475,9 +1482,13 @@ func (c *Conn) writeNoWait(b []byte) int {
 			return sent
 		}
 	}
-	if c.isFull(-1) {
-		// Stop accepting writes until the window opens up again.
+	// A smaller concurrent write can still proceed without clearing the
+	// credit requirement of a writer already asleep.
+	if c.state != csConnectedFull {
 		c.state = csConnectedFull
+		c.blockedWriteBytes = numToSend
+	} else {
+		c.blockedWriteBytes = min(c.blockedWriteBytes, numToSend)
 	}
 	return sent
 }
@@ -1488,6 +1499,9 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	for len(b) > 0 {
 		if err = c.statusErrLocked(c.writeDeadline); err != nil {
 			break
+		}
+		if c.curWindowPackets == 0 {
+			c.s.updateCurrentMS()
 		}
 		n1 := c.writeNoWait(b)
 		b = b[n1:]

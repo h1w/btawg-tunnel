@@ -203,7 +203,7 @@ func serveConn(ctx context.Context, c net.Conn, auth AuthorizeFunc, policy exitP
 	if udp != nil {
 		policy.pumpUDP(life, c, udp)
 	} else {
-		splice(c, peerConn)
+		socks.RelayTCP(life, c, peerConn)
 	}
 }
 
@@ -267,6 +267,8 @@ func (c *admittedConn) Close() error {
 	c.once.Do(func() { <-originSlots })
 	return err
 }
+
+func (c *admittedConn) CloseWrite() error { return closeWrite(c.Conn) }
 
 // Forward io.Copy fast paths (not part of the net.Conn interface) to the
 // actual socket, including kernel splice for TCP where the OS supports it.
@@ -348,18 +350,4 @@ func attemptSession(transport, setup context.Context, open OpenFunc, q command) 
 
 func closeOnCancel(ctx context.Context, c net.Conn) func() bool {
 	return context.AfterFunc(ctx, func() { _ = c.Close() })
-}
-
-func splice(a, b net.Conn) {
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		_, _ = io.Copy(b, a)
-		_ = a.Close()
-		_ = b.Close()
-	}()
-	_, _ = io.Copy(a, b)
-	_ = b.Close()
-	_ = a.Close()
-	<-done
 }

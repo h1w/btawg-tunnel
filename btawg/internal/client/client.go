@@ -21,6 +21,7 @@ import (
 	"github.com/amnezia-vpn/amneziawg-go/v3/tun/netstack"
 
 	"bittorrent-tunnel/btawg/internal/awg"
+	"bittorrent-tunnel/btawg/internal/awgrepair"
 	carrierbind "bittorrent-tunnel/btawg/internal/bind"
 	"bittorrent-tunnel/btawg/internal/carrier"
 	"bittorrent-tunnel/btawg/internal/config"
@@ -34,16 +35,18 @@ const retryDelay = 3 * time.Second
 
 // Client is the assembled btawg client node.
 type Client struct {
-	cfg  config.ClientConfig
-	bind conn.Bind
-	dev  *device.Device
-	ns   *netstack.Net // non-nil in netstack mode
-	ip   *tlsTunnel    // non-nil for TLS carrier modes
+	cfg      config.ClientConfig
+	bind     conn.Bind
+	dev      *device.Device
+	recovery *awgrepair.Device // AWG only; owns no carrier sockets
+	ns       *netstack.Net     // non-nil in netstack mode
+	ip       *tlsTunnel        // non-nil for TLS carrier modes
 
-	proxyTCP func(ctx context.Context, addr netip.AddrPort) (net.Conn, error)
-	proxyUDP func(ctx context.Context) (net.PacketConn, error)
-	closeTUN func() error
-	path     *tunPath
+	proxyTCP    func(ctx context.Context, addr netip.AddrPort) (net.Conn, error)
+	nativeSOCKS func(ctx context.Context, addr netip.AddrPort) (net.Conn, error)
+	proxyUDP    func(ctx context.Context) (net.PacketConn, error)
+	closeTUN    func() error
+	path        *tunPath
 
 	disc func(ctx context.Context) ([]netip.AddrPort, error)
 
@@ -136,6 +139,17 @@ func (c *Client) start(tunDev tun.Device) error {
 	}
 
 	mode := c.cfg.Transport
+	if mode != config.ModeWG { // TLS returned above; all remaining modes use an AWG engine.
+		local, _ := netip.ParseAddr(c.cfg.ClientIP)
+		remote, _ := netip.ParseAddr(c.cfg.ServerIP)
+		repair, err := awgrepair.NewNode(tunDev, c.cfg.ClientPrivKey, awgrepair.Peer{Local: local, Remote: remote, Public: c.cfg.ServerPubKey}, mode)
+		if err != nil {
+			tunDev.Close()
+			return fmt.Errorf("%s recovery: %w", mode, err)
+		}
+		tunDev = repair
+		c.recovery = repair
+	}
 	if config.IsNativeMode(mode) {
 		c.bind = newUnderlayBind()
 	} else {
@@ -149,7 +163,9 @@ func (c *Client) start(tunDev tun.Device) error {
 	if config.IsNativeMode(mode) {
 		ipc, err = c.cfg.NativeDeviceConfig(mode)
 	} else {
-		ipc = awg.ClientConf(c.cfg)
+		// The TUN event reader can bring the device up before discovery.
+		// Install the carrier peer only when it has a path to send on.
+		ipc = "private_key=" + c.cfg.ClientPrivKey + "\n" + c.cfg.Profile.DeviceIPC()
 		err = c.cfg.Profile.Validate()
 	}
 	if err != nil {
@@ -163,6 +179,9 @@ func (c *Client) start(tunDev tun.Device) error {
 	if err := c.dev.Up(); err != nil {
 		c.dev.Close()
 		return fmt.Errorf("client up: %w", err)
+	}
+	if c.recovery != nil && config.IsNativeMode(mode) {
+		c.recovery.StartAuto()
 	}
 	return nil
 }
@@ -293,6 +312,12 @@ func (c *Client) runTunnel(ctx context.Context, active *atomic.Pointer[carrierHe
 	}
 
 	serverEp := carrierbind.Endpoint(netip.MustParseAddr(c.cfg.ServerIP))
+	var key device.NoisePublicKey
+	if c.ip == nil {
+		if err := key.FromHex(c.cfg.ServerPubKey); err != nil {
+			return fmt.Errorf("carrier hub key: %w", err)
+		}
+	}
 	hash, _ := c.carrierInfoHash()
 	for {
 		// DHT announces may not have landed yet when we look: retry the
@@ -344,16 +369,26 @@ func (c *Client) runTunnel(ctx context.Context, active *atomic.Pointer[carrierHe
 				continue
 			}
 		}
-		fmt.Printf("btawg-client: carrier connected to %s\n", addrs[0])
 		c.bind.(*carrierbind.Bind).Attach(serverEp, t)
+		peer := c.dev.LookupPeer(key)
+		if peer == nil {
+			if err := c.dev.IpcSet(awg.ClientConf(c.cfg)); err != nil {
+				c.bind.(*carrierbind.Bind).Detach(serverEp)
+				t.Wait()
+				return fmt.Errorf("configure attached carrier peer: %w", err)
+			}
+			peer = c.dev.LookupPeer(key)
+			if peer == nil {
+				c.bind.(*carrierbind.Bind).Detach(serverEp)
+				t.Wait()
+				return fmt.Errorf("attached carrier hub peer missing after configuration")
+			}
+		}
+		c.recovery.StartAuto() // the carrier is attached and the AWG peer now exists
+		peer.SendKeepalive()
+		fmt.Printf("btawg-client: carrier connected to %s\n", addrs[0])
 		if active != nil {
 			active.Store(&carrierHealth{done: t.Done()})
-		}
-		var key device.NoisePublicKey
-		if key.FromHex(c.cfg.ServerPubKey) == nil {
-			if peer := c.dev.LookupPeer(key); peer != nil {
-				peer.SendKeepalive()
-			}
 		}
 		select {
 		case <-t.Done():

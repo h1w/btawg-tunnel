@@ -3,6 +3,8 @@ package server
 import (
 	"sync/atomic"
 
+	"bittorrent-tunnel/btawg/internal/awgrepair"
+	"bittorrent-tunnel/btawg/internal/config"
 	"bittorrent-tunnel/btawg/internal/store"
 )
 
@@ -32,6 +34,54 @@ func (s *Server) Traffic() map[string]store.Traffic {
 		out[id] = c.snapshot()
 	}
 	return out
+}
+
+// EngineQueueDrops returns cumulative queue-full packet counts for this hub
+// process. TLS sessions are counted together, including sessions that ended.
+func (s *Server) EngineQueueDrops() map[string]uint64 {
+	r := s.router
+	r.routesMu.RLock()
+	defer r.routesMu.RUnlock()
+	out := make(map[string]uint64, len(r.engines)+3)
+	out[config.ModeWG] = r.wg.queueDrops.Load()
+	out[config.ModeAWG] = r.awg.queueDrops.Load()
+	out["tls"] = r.tlsQueueDrops.Load()
+	for mode, e := range r.engines {
+		out[mode] = e.queueDrops.Load()
+	}
+	return out
+}
+
+// AWGRepairStats sums the native and four carrier AWG engines, never TLS-IP or WG.
+func (s *Server) AWGRepairStats() awgrepair.Stats {
+	var total awgrepair.Stats
+	if s.router == nil {
+		return total
+	}
+	for _, e := range s.router.awgEngines() {
+		if e == nil {
+			continue
+		}
+		if recovery := e.recovery.Load(); recovery != nil {
+			v := recovery.Stats()
+			total.ParityBlocks += v.ParityBlocks
+			total.Recovered += v.Recovered
+			total.ControlBytes += v.ControlBytes
+			total.Expired += v.Expired
+			total.ReplicaPackets += v.ReplicaPackets
+			total.ReplicaBytes += v.ReplicaBytes
+			total.Duplicates += v.Duplicates
+			total.CodedPieces += v.CodedPieces
+			total.WindowClamps += v.WindowClamps
+			total.AutoTxOn += v.AutoTxOn
+			total.AutoTxOff += v.AutoTxOff
+			total.AutoRxOn += v.AutoRxOn
+			total.AutoRxOff += v.AutoRxOff
+			total.AutoSamples += v.AutoSamples
+			total.AutoMissing += v.AutoMissing
+		}
+	}
+	return total
 }
 
 // flushTraffic is called by the sampler, then on shutdown after the sampler
