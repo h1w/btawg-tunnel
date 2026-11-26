@@ -1,0 +1,11 @@
+arm	loss	seed	run	seconds	receiver_bytes	Mbps	hub_engine_drops	random_drops	extra_drops
+timeout-credit	0	101	run.SNtTBfPf	11.999976	282051952	188.035	4689	0	0
+guarded	0	101	run.YinSK8z5	12.000012	272202756	181.468	7258	0	0
+timeout-credit	1	101	run.Q2SXA9Bi	11.999986	892756	0.595	0	29	0
+guarded	1	101	run.MfUZGgSp	12.000026	2305208	1.537	55	77	0
+guarded	1	211	run.vRhWhEk0	12.000028	2050036	1.367	0	59	0
+timeout-credit	1	211	run.RuMDg4F7	11.999993	951700	0.634	0	27	0
+timeout-credit	c	101	run.OvrfJiOX	12.000067	4063452	2.709	539	0	208
+guarded	c	101	run.VOSQa37a	12.000025	3885392	2.590	450	0	193
+guarded	c	211	run.7LHvdeiw	11.999985	3929600	2.620	486	0	216
+timeout-credit	c	211	run.LXBD3MhI	11.999991	4101520	2.734	478	0	231

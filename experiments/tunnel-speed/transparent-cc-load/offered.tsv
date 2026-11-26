@@ -1,0 +1,13 @@
+run	seed	hub_cores	mode	direction	status	offered_Mbps	receiver_Mbps	app_lost	hub_q_drops	client_q_drops	p95_ms
+run.Kk381SPJ	600	0-3	socks5-awg-udp	down	ok	600.003	599.827	86	86	0	1.06
+run.zkRf2KHJ	800	0-3	socks5-awg-udp	down	ok	799.999	799.974	0	0	0	4.44
+run.cTJEYDjw	1000	0-3	socks5-awg-udp	down	ok	1000.004	998.788	546	4751	0	118.00
+run.GTn3Rdxg	600	0-1	socks5-awg-udp	down	ok	599.998	599.667	0	738	0	1.41
+run.0zB1Oo67	800	0-1	socks5-awg-udp	down	ok	800.002	800.021	0	1	0	3.94
+run.GrWyhBw3	1000	0-1	socks5-awg-udp	down	ok	1000.008	939.528	31020	49457	0	198.00
+run.FDaEwywT	600	0-1	socks5-awg-udp	down	ok	599.999	599.993	0	26	0	1.48
+run.hitiAlXg	800	0-1	socks5-awg-udp	down	ok	800.006	799.976	0	681	0	24.10
+run.FVbO7hDx	1000	0-1	socks5-awg-udp	down	ok	1000.012	949.812	26347	45927	0	206.00
+run.Hw3pfQR7	600	0-3	socks5-awg-udp	down	ok	599.995	600.002	0	0	0	1.38
+run.WPVVegA4	800	0-3	socks5-awg-udp	down	ok	799.998	799.305	0	0	0	5.31
+run.WIpLAWEn	1000	0-3	socks5-awg-udp	down	ok	999.994	1001.057	731	1218	0	123.00

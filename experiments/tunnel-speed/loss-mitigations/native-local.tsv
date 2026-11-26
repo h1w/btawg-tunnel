@@ -1,0 +1,42 @@
+suite	run	round	loss	added_RTT_ms	mode	variant	streams	direction	status	Mbit_s	ICMP_p95_ms	netem_loss_down_pct	netem_loss_up_pct	underlay_bytes_per_payload_byte	dup_hub	dup_client	retransmits	TCP	UDP_RcvbufErrors
+native	run.ROTbrU0i	1	0	0	socks5-wg-udp	base	1	down	ok	819.722	17.600	0.000	0.000	1.711	0	0	139	cubic	0
+native	run.ROTbrU0i	1	0	0	socks5-wg-udp	base	8	down	ok	823.409	225.000	0.000	0.000	1.778	0	0	9684	cubic	0
+native	run.ROTbrU0i	1	0	0	socks5-awg-udp	base	1	down	ok	782.500	10.300	0.000	0.000	1.880	0	0	89	cubic	0
+native	run.ROTbrU0i	1	0	0	socks5-awg-udp	base	8	down	ok	776.483	126.000	0.000	0.000	1.916	0	0	5607	cubic	0
+native	run.ROTbrU0i	2	1	0	socks5-wg-udp	base	1	down	ok	122.947	0.575	0.946	0.895	1.704	0	0	494	cubic	0
+native	run.ROTbrU0i	2	1	0	socks5-wg-udp	base	8	down	ok	544.259	1.050	1.026	1.014	1.730	0	0	2293	cubic	0
+native	run.ROTbrU0i	2	1	0	socks5-awg-udp	base	1	down	ok	83.362	0.553	1.038	0.907	2.127	0	0	350	cubic	0
+native	run.ROTbrU0i	2	1	0	socks5-awg-udp	base	8	down	ok	532.424	0.845	1.022	1.012	1.895	0	0	2250	cubic	0
+native	run.ROTbrU0i	3	1	0	socks5-wg-udp	dup-down	1	down	ok	558.107	2.870	1.012	0.990	3.356	27275	0	24	cubic	0
+native	run.ROTbrU0i	3	1	0	socks5-wg-udp	dup-down	8	down	ok	557.850	21.900	0.980	1.008	3.380	32125	0	16	cubic	0
+native	run.ROTbrU0i	3	1	0	socks5-awg-udp	dup-down	1	down	ok	546.047	2.720	0.986	1.006	3.554	26832	0	29	cubic	0
+native	run.ROTbrU0i	3	1	0	socks5-awg-udp	dup-down	8	down	ok	545.527	17.300	0.986	1.020	3.580	32575	0	27	cubic	0
+native	run.ROTbrU0i	4	1	0	socks5-wg-udp	dup-both	1	down	ok	520.075	2.840	0.992	1.029	3.476	25678	145726	24	cubic	0
+native	run.ROTbrU0i	4	1	0	socks5-wg-udp	dup-both	8	down	ok	544.483	23.500	1.009	1.029	3.438	34272	150175	25	cubic	0
+native	run.ROTbrU0i	4	1	0	socks5-awg-udp	dup-both	1	down	ok	493.356	3.030	1.009	0.967	3.744	24561	136451	30	cubic	0
+native	run.ROTbrU0i	4	1	0	socks5-awg-udp	dup-both	8	down	ok	518.529	24.100	1.015	1.003	3.759	34806	144160	25	cubic	0
+native	run.ROTbrU0i	5	0	0	socks5-wg-udp	dup-both	1	down	ok	541.591	11.600	0.000	0.000	3.452	25784	153612	0	cubic	0
+native	run.ROTbrU0i	5	0	0	socks5-wg-udp	dup-both	8	down	ok	532.699	128.000	0.000	0.000	3.626	29751	150561	1708	cubic	0
+native	run.ROTbrU0i	5	0	0	socks5-awg-udp	dup-both	1	down	ok	520.888	37.700	0.000	0.000	3.790	25255	147718	54	cubic	0
+native	run.ROTbrU0i	5	0	0	socks5-awg-udp	dup-both	8	down	ok	516.022	80.000	0.000	0.000	3.855	29691	145087	1476	cubic	3396
+SUMMARY	suite	loss	added_RTT_ms	mode	variant	streams	direction	valid	total	median_Mbit_s	median_ICMP_p95_ms	median_underlay_bytes_per_payload_byte
+SUMMARY	native	0	0	socks5-awg-udp	base	1	down	1	1	782.500	10.300	1.880
+SUMMARY	native	0	0	socks5-awg-udp	base	8	down	1	1	776.483	126.000	1.916
+SUMMARY	native	0	0	socks5-awg-udp	dup-both	1	down	1	1	520.888	37.700	3.790
+SUMMARY	native	0	0	socks5-awg-udp	dup-both	8	down	1	1	516.022	80.000	3.855
+SUMMARY	native	0	0	socks5-wg-udp	base	1	down	1	1	819.722	17.600	1.711
+SUMMARY	native	0	0	socks5-wg-udp	base	8	down	1	1	823.409	225.000	1.778
+SUMMARY	native	0	0	socks5-wg-udp	dup-both	1	down	1	1	541.591	11.600	3.452
+SUMMARY	native	0	0	socks5-wg-udp	dup-both	8	down	1	1	532.699	128.000	3.626
+SUMMARY	native	1	0	socks5-awg-udp	base	1	down	1	1	83.362	0.553	2.127
+SUMMARY	native	1	0	socks5-awg-udp	base	8	down	1	1	532.424	0.845	1.895
+SUMMARY	native	1	0	socks5-awg-udp	dup-both	1	down	1	1	493.356	3.030	3.744
+SUMMARY	native	1	0	socks5-awg-udp	dup-both	8	down	1	1	518.529	24.100	3.759
+SUMMARY	native	1	0	socks5-awg-udp	dup-down	1	down	1	1	546.047	2.720	3.554
+SUMMARY	native	1	0	socks5-awg-udp	dup-down	8	down	1	1	545.527	17.300	3.580
+SUMMARY	native	1	0	socks5-wg-udp	base	1	down	1	1	122.947	0.575	1.704
+SUMMARY	native	1	0	socks5-wg-udp	base	8	down	1	1	544.259	1.050	1.730
+SUMMARY	native	1	0	socks5-wg-udp	dup-both	1	down	1	1	520.075	2.840	3.476
+SUMMARY	native	1	0	socks5-wg-udp	dup-both	8	down	1	1	544.483	23.500	3.438
+SUMMARY	native	1	0	socks5-wg-udp	dup-down	1	down	1	1	558.107	2.870	3.356
+SUMMARY	native	1	0	socks5-wg-udp	dup-down	8	down	1	1	557.850	21.900	3.380

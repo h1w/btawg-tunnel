@@ -1,0 +1,7 @@
+profile	run	arm	rate_Mbps	queue	cap_Mbps	goodput_Mbps	ping_p95_ms	random_drops	excess_drops	hub_engine_drops	competitor_sent_Mbps	competitor_received_Mbps	hub_waits	hub_recovered_at_peer	hub_send_drops	client_send_drops
+fec-budget-cross	run.NXXTf6gN	shim	120	2048	0	7.006	203.0	457	0	0	45.002	44.571	0	0	0	0
+fec-budget-cross	run.QgfUifSa	fec	120	2048	0	59.192	281.0	1410	3112	0	45.003	43.976	0	700	0	0
+fec-budget-cross	run.jCPiaDaL	budget	120	2048	60	47.722	482.0	1149	0	0	45.003	44.513	44446	483	0	0
+fec-budget-narrow	run.kmJZ9kXL	shim	10	160	0	5.960	268.0	120	169	0	-	-	0	0	0	0
+fec-budget-narrow	run.7BdsE4mu	fec	10	160	0	7.988	318.0	164	499	0	-	-	0	189	0	0
+fec-budget-narrow	run.ckrzs1d0	budget	10	160	6	4.839	1373.0	103	0	0	-	-	49367	56	11	0

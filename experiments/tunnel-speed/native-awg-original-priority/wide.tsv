@@ -1,0 +1,7 @@
+arm	loss	seed	tunnel_flows	link_Mbps	run	status	tunnel_Mbps	direct_Mbps	direct_early_Mbps	direct_late_Mbps	rtt_p95_ms	rtt_replies	fifo_drops	random_drops	excess_netem	engine_drops	udp_rcv_errors	overlay_p95_ms	hub_recovered	client_recovered	hub_parity	client_parity	shim_payload_overhead_pct	queue_reports	delay_suspends	invalid	local_drop	hub_wire_tx	hub_wire_payload_bytes	pacer_rate_Bps	pacer_originals	pacer_wire_bytes	pacer_skipped_repair	pacer_original_drops	pacer_local_max_us
+shim	1	101	8	0	run.HU3tgLcr	ok	6.462	-	-	-	200.0	60	0	215	0	0	0	202.0	0	0	0	0	0.00	0	0	0	0	14618	19549946	0	0	0	0	0	0
+cap	1	101	8	0	run.Ij0otgVo	ok	5.358	-	-	-	200.0	56	0	145	0	0	0	202.0	0	0	0	0	0.64	0	0	0	0	9622	12922798	10000000	9622	13192214	0	84	7513
+priority	1	101	8	0	run.8pQe5t6N	ok	5.612	-	-	-	200.0	58	0	146	0	0	0	202.0	0	4	25	0	0.69	0	0	0	0	9942	13359689	10000000	9917	13638065	1031	106	5042
+priority	1	211	8	0	run.Qc7lktFA	ok	5.364	-	-	-	200.0	59	0	161	0	0	0	202.0	0	8	35	0	-1.08	0	0	0	0	10153	13637089	10000000	10118	13921373	893	324	6243
+cap	1	211	8	0	run.vOEfyrkW	ok	4.478	-	-	-	200.0	59	0	127	0	0	0	202.0	0	0	0	0	0.62	0	0	0	0	8211	11010371	10000000	8211	11240279	0	73	5863
+shim	1	211	8	0	run.nYaLRvzm	ok	5.345	-	-	-	200.0	59	0	192	0	0	0	202.0	0	0	0	0	0.00	0	0	0	0	12959	17313428	0	0	0	0	0	0

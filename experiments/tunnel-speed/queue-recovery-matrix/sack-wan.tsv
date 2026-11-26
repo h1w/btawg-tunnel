@@ -1,0 +1,5 @@
+arm	seed	run	seconds	receiver_bytes	Mbps	hub_queue_drops	netem_random_drops	netem_excess_drops
+base	101	run.yApz7dwl	11.999997	827672	0.552	0	29	0
+sack	101	run.4meQ5yly	12.000030	822760	0.549	0	27	0
+sack	101	run.ZQ7K4viR	11.999990	870132	0.580	0	30	0
+base	101	run.CQ6wayHK	12.000012	893212	0.595	0	28	0

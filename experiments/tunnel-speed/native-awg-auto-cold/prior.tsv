@@ -1,0 +1,7 @@
+arm	loss	seed	tunnel_flows	link_Mbps	direction	run	status	tunnel_Mbps	direct_Mbps	rtt_p95_ms	rtt_replies	fifo_drops	random_drops	excess_netem	engine_drops	udp_rcv_errors	overlay_p95_ms	overlay_n	hub_tx_bytes	hub_tx_packets	cli_tx_bytes	cli_tx_packets	wire_bytes	payload_bytes	wire_ratio	down_loss_pct	up_loss_pct	window_s	hub_parity_blocks	hub_recovered	hub_control_bytes	hub_expired_controls
+auto	1	101	1	0	down	run.tjLc2aIE	ok	2.199	-	200.0	49	0	49	0	0	0	201.0	48	4155557	3288	454383	1327	4609940	2748264	1.677	1.063	1.048	10.000	0	0	602550	0
+coded	1	101	1	0	down	run.hmTjYfiG	ok	65.583	-	200.0	47	0	1386	0	0	0	201.0	48	132550982	102470	10873311	30925	143424293	81980096	1.750	1.041	1.018	10.000	0	0	25509370	0
+auto	1	211	1	0	up	run.u307fLgZ	ok	1.462	-	200.0	49	0	37	0	0	0	201.0	49	318152	935	3110474	2502	3428626	1827264	1.876	1.166	1.038	10.000	0	12	5592	0
+coded	1	211	1	0	up	run.ueTuFjlT	ok	58.054	-	200.0	49	0	1242	0	0	0	208.0	49	9749127	27556	115023397	88781	124772524	72567984	1.719	1.099	1.057	10.000	0	593	570	0
+auto	1	211	8	0	down	run.GLQA4Ewg	ok	24.303	-	200.0	49	0	545	0	0	0	201.0	49	47509104	36589	4291209	12264	51800313	30378884	1.705	1.081	1.143	10.000	0	0	8407236	0
+auto	1	101	8	0	up	run.oqWqGyGq	ok	20.412	-	200.0	49	0	389	0	0	0	201.0	47	3715908	10511	38769819	29588	42485727	25514792	1.665	0.891	0.996	10.000	0	139	9927	0

@@ -1,0 +1,142 @@
+run.KOnjP6hC interval_s=16.000 qdisc_drops 2332 matched_missing 2332 peak_qlen 160
+load type packets IP_bytes missing
+new_data 17352 14035540 2107
+retransmitted_data 3074 3087797 168
+ack 1158 55584 57
+other 0 0 0
+peak_10ms_total s=15.400 new_data=17.809 retransmitted_data=1.382 ack=0.000 other=0.000
+peak_10ms_retransmitted_data s=7.890 new_data=0.000 retransmitted_data=14.078 ack=0.077 other=0.000
+peak_100ms_total s=15.400 new_data=13.919 retransmitted_data=1.494 ack=0.000 other=0.000
+peak_100ms_retransmitted_data s=12.400 new_data=0.000 retransmitted_data=8.355 ack=0.000 other=0.000
+first_drop_s=2.532221 type new_data seq 57936 qlen_bracket 155 157 qdisc_drop_bracket 0 1
+first_retransmit_s=2.740277 seq 57936 after_first_drop_ms=208.056
+before_first_drop ingress pps 1570 IP_Mbps 9.185 mean_IP_bytes 731.3
+before_first_drop egress pps 1340 IP_Mbps 7.642 mean_IP_bytes 712.9
+100ms_before_first_drop type packets IP_bytes missing
+new_data 143 114146 0
+retransmitted_data 0 0 0
+ack 14 672 0
+other 0 0 0
+first_200ms_after_drop type packets IP_bytes missing
+new_data 310 248061 33
+retransmitted_data 0 0 0
+ack 28 1344 0
+other 0 0 0
+retransmit_fraction_of_offered_IP_bytes 17.97 retransmit_fraction_of_matched_drops 7.2
+first-100ms inferred_qlen 137 new_data=120 retransmitted_data=0 ack=17 other=0
+first-50ms inferred_qlen 146 new_data=130 retransmitted_data=0 ack=16 other=0
+first-drop inferred_qlen 160 new_data=146 retransmitted_data=0 ack=14 other=0
+near-full samples 571 residency_packets {'ack': 3916, 'new_data': 76463, 'retransmitted_data': 9306} residency_IP_bytes {'ack': 187968, 'new_data': 59517542, 'retransmitted_data': 9108279}
+full samples 99 residency_packets {'ack': 893, 'new_data': 13432, 'retransmitted_data': 1422} residency_IP_bytes {'ack': 42864, 'new_data': 10401928, 'retransmitted_data': 1384206}
+offered_IP_Mbps [9.132, 0.0, 0.054, 0.0] [9.922, 0.0, 0.054, 0.0] [7.018, 1.544, 0.028, 0.0]
+rate_change_s=2.423680 ack old_Mbps 8.905 new_Mbps 10.465 round_sent_acked_and_counts 185822 175293 1 1 0 0
+rate_change_s=2.625634 ack old_Mbps 10.465 new_Mbps 13.082 round_sent_acked_and_counts 227451 185692 2 1 0 0
+rate_change_s=3.243801 ack old_Mbps 13.082 new_Mbps 16.352 round_sent_acked_and_counts 150069 235230 3 2 0 0
+rate_change_s=3.367638 rto old_Mbps 16.352 new_Mbps 8.176 round_sent_acked_and_counts 0 142545 3 2 1 0
+run.yG1mNeY6 interval_s=16.000 qdisc_drops 1282 matched_missing 1282 peak_qlen 160
+load type packets IP_bytes missing
+new_data 17674 14271252 1208
+retransmitted_data 1721 1766897 19
+ack 1217 58416 55
+other 0 0 0
+peak_10ms_total s=6.700 new_data=16.918 retransmitted_data=0.000 ack=0.000 other=0.000
+peak_10ms_retransmitted_data s=8.360 new_data=0.235 retransmitted_data=9.790 ack=0.000 other=0.000
+peak_100ms_total s=15.100 new_data=13.604 retransmitted_data=0.000 ack=0.108 other=0.000
+peak_100ms_retransmitted_data s=14.200 new_data=0.000 retransmitted_data=6.938 ack=0.000 other=0.000
+first_drop_s=3.103512 type new_data seq 6401 qlen_bracket 155 160 qdisc_drop_bracket 0 2
+first_retransmit_s=3.311173 seq 6401 after_first_drop_ms=207.661
+before_first_drop ingress pps 1600 IP_Mbps 9.696 mean_IP_bytes 757.5
+before_first_drop egress pps 1320 IP_Mbps 7.898 mean_IP_bytes 747.9
+100ms_before_first_drop type packets IP_bytes missing
+new_data 150 120720 0
+retransmitted_data 0 0 0
+ack 10 480 0
+other 0 0 0
+first_200ms_after_drop type packets IP_bytes missing
+new_data 351 282061 72
+retransmitted_data 0 0 0
+ack 30 1440 3
+other 0 0 0
+retransmit_fraction_of_offered_IP_bytes 10.98 retransmit_fraction_of_matched_drops 1.48
+first-100ms inferred_qlen 132 new_data=122 retransmitted_data=0 ack=10 other=0
+first-50ms inferred_qlen 144 new_data=137 retransmitted_data=0 ack=7 other=0
+first-drop inferred_qlen 160 new_data=150 retransmitted_data=0 ack=10 other=0
+near-full samples 452 residency_packets {'new_data': 63253, 'ack': 3971, 'retransmitted_data': 3354} residency_IP_bytes {'new_data': 49838872, 'ack': 190608, 'retransmitted_data': 3403133}
+full samples 54 residency_packets {'new_data': 7706, 'ack': 613, 'retransmitted_data': 271} residency_IP_bytes {'new_data': 5970074, 'ack': 29424, 'retransmitted_data': 258595}
+offered_IP_Mbps [9.658, 0.0, 0.038, 0.0] [11.282, 0.0, 0.058, 0.0] [7.136, 0.883, 0.029, 0.0]
+rate_change_s=2.823380 ack old_Mbps 8.959 new_Mbps 10.63 round_sent_acked_and_counts 178980 178060 3 3 0 0
+rate_change_s=3.024012 ack old_Mbps 10.63 new_Mbps 13.288 round_sent_acked_and_counts 196697 179084 4 3 0 0
+rate_change_s=3.311108 fast-loss old_Mbps 13.288 new_Mbps 10.63 round_sent_acked_and_counts 124579 102693 4 3 1 0
+rate_change_s=3.641668 ack old_Mbps 10.63 new_Mbps 13.212 round_sent_acked_and_counts 98040 230113 4 3 1 0
+rate_change_s=3.966332 ack old_Mbps 13.212 new_Mbps 16.515 round_sent_acked_and_counts 4737 125026 5 3 1 0
+run.DhmpTp0F interval_s=16.000 qdisc_drops 900 matched_missing 900 peak_qlen 160
+load type packets IP_bytes missing
+new_data 17815 14401439 864
+retransmitted_data 1321 1306665 10
+ack 1318 63264 26
+other 0 0 0
+peak_10ms_total s=3.520 new_data=16.770 retransmitted_data=0.000 ack=0.077 other=0.000
+peak_10ms_retransmitted_data s=4.820 new_data=1.304 retransmitted_data=11.103 ack=0.000 other=0.000
+peak_100ms_total s=3.500 new_data=12.176 retransmitted_data=0.000 ack=0.031 other=0.000
+peak_100ms_retransmitted_data s=15.200 new_data=0.000 retransmitted_data=6.926 ack=0.000 other=0.000
+first_drop_s=2.687190 type new_data seq 45517 qlen_bracket 153 160 qdisc_drop_bracket 0 4
+first_retransmit_s=2.893769 seq 45517 after_first_drop_ms=206.579
+before_first_drop ingress pps 1590 IP_Mbps 9.247 mean_IP_bytes 727.0
+before_first_drop egress pps 1260 IP_Mbps 7.196 mean_IP_bytes 713.8
+100ms_before_first_drop type packets IP_bytes missing
+new_data 144 114867 0
+retransmitted_data 0 0 0
+ack 15 720 0
+other 0 0 0
+first_200ms_after_drop type packets IP_bytes missing
+new_data 268 214831 4
+retransmitted_data 0 0 0
+ack 25 1200 0
+other 0 0 0
+retransmit_fraction_of_offered_IP_bytes 8.29 retransmit_fraction_of_matched_drops 1.11
+first-100ms inferred_qlen 127 new_data=111 retransmitted_data=0 ack=16 other=0
+first-50ms inferred_qlen 136 new_data=118 retransmitted_data=0 ack=18 other=0
+first-drop inferred_qlen 160 new_data=145 retransmitted_data=0 ack=15 other=0
+near-full samples 317 residency_packets {'new_data': 45309, 'ack': 2862, 'retransmitted_data': 1310} residency_IP_bytes {'new_data': 36046134, 'ack': 137376, 'retransmitted_data': 1202308}
+full samples 46 residency_packets {'new_data': 6701, 'ack': 518, 'retransmitted_data': 101} residency_IP_bytes {'new_data': 5295915, 'ack': 24864, 'retransmitted_data': 95680}
+offered_IP_Mbps [9.189, 0.0, 0.058, 0.0] [8.593, 0.0, 0.048, 0.0] [7.201, 0.653, 0.032, 0.0]
+rate_change_s=2.434113 ack old_Mbps 7.907 new_Mbps 9.41 round_sent_acked_and_counts 163876 158400 2 2 0 0
+rate_change_s=2.633871 ack old_Mbps 9.41 new_Mbps 11.762 round_sent_acked_and_counts 185934 159812 3 2 0 0
+rate_change_s=2.893670 fast-loss old_Mbps 11.762 new_Mbps 9.41 round_sent_acked_and_counts 67712 68236 3 2 1 0
+rate_change_s=3.237918 ack old_Mbps 9.41 new_Mbps 12.419 round_sent_acked_and_counts 173890 206987 3 2 1 0
+rate_change_s=3.438144 ack old_Mbps 12.419 new_Mbps 15.524 round_sent_acked_and_counts 223059 172919 4 2 1 0
+rate_change_s=3.620080 fast-loss old_Mbps 15.524 new_Mbps 12.419 round_sent_acked_and_counts 271141 191374 4 2 2 0
+run.AzPtHGza interval_s=16.000 qdisc_drops 2175 matched_missing 2175 peak_qlen 160
+load type packets IP_bytes missing
+new_data 16927 13674295 1950
+retransmitted_data 2544 2470910 157
+ack 1389 66672 68
+other 0 0 0
+peak_10ms_total s=7.910 new_data=16.551 retransmitted_data=4.831 ack=0.000 other=0.000
+peak_10ms_retransmitted_data s=7.980 new_data=3.880 retransmitted_data=14.859 ack=0.000 other=0.000
+peak_100ms_total s=7.900 new_data=10.441 retransmitted_data=5.462 ack=0.023 other=0.000
+peak_100ms_retransmitted_data s=14.600 new_data=0.000 retransmitted_data=8.784 ack=0.000 other=0.000
+first_drop_s=2.899323 type new_data seq 43576 qlen_bracket 157 158 qdisc_drop_bracket 0 5
+first_retransmit_s=3.106420 seq 43576 after_first_drop_ms=207.097
+before_first_drop ingress pps 1590 IP_Mbps 9.399 mean_IP_bytes 738.9
+before_first_drop egress pps 1280 IP_Mbps 7.377 mean_IP_bytes 720.4
+100ms_before_first_drop type packets IP_bytes missing
+new_data 145 116816 0
+retransmitted_data 0 0 0
+ack 14 672 0
+other 0 0 0
+first_200ms_after_drop type packets IP_bytes missing
+new_data 330 267466 63
+retransmitted_data 0 0 0
+ack 36 1728 1
+other 0 0 0
+retransmit_fraction_of_offered_IP_bytes 15.24 retransmit_fraction_of_matched_drops 7.22
+first-100ms inferred_qlen 129 new_data=111 retransmitted_data=0 ack=18 other=0
+first-50ms inferred_qlen 136 new_data=121 retransmitted_data=0 ack=15 other=0
+first-drop inferred_qlen 160 new_data=145 retransmitted_data=0 ack=15 other=0
+near-full samples 405 residency_packets {'ack': 3159, 'new_data': 51961, 'retransmitted_data': 8615} residency_IP_bytes {'ack': 151632, 'new_data': 40016927, 'retransmitted_data': 8200970}
+full samples 94 residency_packets {'ack': 657, 'new_data': 12074, 'retransmitted_data': 2232} residency_IP_bytes {'ack': 31536, 'new_data': 9167521, 'retransmitted_data': 2113689}
+offered_IP_Mbps [9.345, 0.0, 0.054, 0.0] [10.699, 0.0, 0.069, 0.0] [6.837, 1.235, 0.033, 0.0]
+rate_change_s=2.834542 ack old_Mbps 9.7 new_Mbps 12.542 round_sent_acked_and_counts 195130 210077 3 3 0 0
+rate_change_s=3.035489 ack old_Mbps 12.542 new_Mbps 15.677 round_sent_acked_and_counts 240409 195419 4 3 0 0
+rate_change_s=3.670229 ack old_Mbps 15.677 new_Mbps 8.699 round_sent_acked_and_counts 165280 257344 4 4 0 1

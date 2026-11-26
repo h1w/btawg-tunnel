@@ -1,0 +1,380 @@
+CASE wide 1 101 1 0 down run.jLqQeLN7
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=2851.143 median_rtt_ms=216.093 median_mss=1228 total_retrans=1161 total_acked_bytes=124218548
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=3412 (random=3412)
+    up_netem=634 (random=634)
+    fifo=0
+  measured_loss_pct (netem):
+    down=1.018
+    up=1.042
+    overall=1.022
+  direction_validation:
+    down: netem_egress_bytes=459247410 netem_random_drops=3412 sender_retrans=1161 sender_acked_bytes=124218548 sender_loss_pct=1.135
+    up:   netem_egress_bytes=20959982 netem_random_drops=634 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=480207392
+      down=459247410 up=20959982
+    measurement_window_useful_bytes=128466524
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=12 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=798 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=285754384 replica_packets=223292 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=0
+
+CASE wide 1 211 1 0 down run.LBI5BYke
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=3083.791 median_rtt_ms=216.501 median_mss=1228 total_retrans=1312 total_acked_bytes=103728520
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=2796 (random=2796)
+    up_netem=549 (random=549)
+    fifo=0
+  measured_loss_pct (netem):
+    down=0.985
+    up=1.106
+    overall=1.003
+  direction_validation:
+    down: netem_egress_bytes=382495972 netem_random_drops=2796 sender_retrans=1312 sender_acked_bytes=103728520 sender_loss_pct=1.529
+    up:   netem_egress_bytes=17314511 netem_random_drops=549 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=399810483
+      down=382495972 up=17314511
+    measurement_window_useful_bytes=105898876
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=5 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=798 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=241939376 replica_packets=189052 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=99
+
+CASE wide 1 101 1 0 up run.a23cC0Vf
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=10132.199 median_rtt_ms=233.157 median_mss=1228 total_retrans=1 total_acked_bytes=135030084
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=960 (random=960)
+    up_netem=3680 (random=3680)
+    fifo=0
+  measured_loss_pct (netem):
+    down=1.058
+    up=0.998
+    overall=1.010
+  direction_validation:
+    down: netem_egress_bytes=31806692 netem_random_drops=960 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+    up:   netem_egress_bytes=495179002 netem_random_drops=3680 sender_retrans=1 sender_acked_bytes=135030084 sender_loss_pct=0.001
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=526985694
+      down=31806692 up=495179002
+    measurement_window_useful_bytes=138470516
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=798 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=202092
+  udp_rcv_errors: hub=0 client=0
+
+CASE wide 1 211 1 0 up run.Lypms2DS
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=13716.664 median_rtt_ms=234.243 median_mss=1228 total_retrans=0 total_acked_bytes=134727196
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=956 (random=956)
+    up_netem=3594 (random=3594)
+    fifo=0
+  measured_loss_pct (netem):
+    down=1.032
+    up=1.005
+    overall=1.010
+  direction_validation:
+    down: netem_egress_bytes=32299281 netem_random_drops=956 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+    up:   netem_egress_bytes=490657244 netem_random_drops=3594 sender_retrans=0 sender_acked_bytes=134727196 sender_loss_pct=0.000
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=522956525
+      down=32299281 up=490657244
+    measurement_window_useful_bytes=138309596
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=798 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=197803
+  udp_rcv_errors: hub=0 client=0
+
+CASE reserve 1 101 8 0 down run.Q6VyyFyT
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=39.574 median_rtt_ms=201.591 median_mss=1228 total_retrans=1193 total_acked_bytes=37564532
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=422 (random=422)
+    up_netem=178 (random=178)
+    fifo=0
+  measured_loss_pct (netem):
+    down=1.015
+    up=1.015
+    overall=1.015
+  direction_validation:
+    down: netem_egress_bytes=55604736 netem_random_drops=422 sender_retrans=1193 sender_acked_bytes=37564532 sender_loss_pct=3.754
+    up:   netem_egress_bytes=6151991 netem_random_drops=178 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=61756727
+      down=55604736 up=6151991
+    measurement_window_useful_bytes=35700428
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=984 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=2692090 expired_controls=0 parity_blocks=1790 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=0
+
+CASE wide 1 101 8 0 down run.gSg8bvL4
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=633.787 median_rtt_ms=236.473 median_mss=1228 total_retrans=959 total_acked_bytes=283078792
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=7690 (random=7690)
+    up_netem=1648 (random=1648)
+    fifo=0
+  measured_loss_pct (netem):
+    down=0.995
+    up=1.033
+    overall=1.001
+  direction_validation:
+    down: netem_egress_bytes=1048820492 netem_random_drops=7690 sender_retrans=959 sender_acked_bytes=283078792 sender_loss_pct=0.414
+    up:   netem_egress_bytes=55693829 netem_random_drops=1648 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=1104514321
+      down=1048820492 up=55693829
+    measurement_window_useful_bytes=290860628
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=22 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=855 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=660460928 replica_packets=516030 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=2838
+
+CASE wide 1 101 8 0 up run.TblRunMe
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=1143.455 median_rtt_ms=464.065 median_mss=1228 total_retrans=1 total_acked_bytes=257204532
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=1351 (random=1351)
+    up_netem=7069 (random=7069)
+    fifo=0
+  measured_loss_pct (netem):
+    down=1.035
+    up=0.999
+    overall=1.005
+  direction_validation:
+    down: netem_egress_bytes=45258592 netem_random_drops=1351 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+    up:   netem_egress_bytes=962519172 netem_random_drops=7069 sender_retrans=1 sender_acked_bytes=257204532 sender_loss_pct=0.000
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=1007777764
+      down=45258592 up=962519172
+    measurement_window_useful_bytes=264209028
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=798 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=453569
+  udp_rcv_errors: hub=0 client=0
+
+CASE reserve 1 101 8 0 up run.o3aW53hy
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=29.980 median_rtt_ms=202.010 median_mss=1228 total_retrans=319 total_acked_bytes=44355060
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=183 (random=183)
+    up_netem=525 (random=525)
+    fifo=0
+  measured_loss_pct (netem):
+    down=1.012
+    up=1.007
+    overall=1.008
+  direction_validation:
+    down: netem_egress_bytes=6409315 netem_random_drops=183 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+    up:   netem_egress_bytes=70002324 netem_random_drops=525 sender_retrans=319 sender_acked_bytes=44355060 sender_loss_pct=0.875
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=76411639
+      down=6409315 up=70002324
+    measurement_window_useful_bytes=44798368
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=45430 expired_controls=0 parity_blocks=0 recovered_packets=146 replica_bytes=0 replica_packets=0 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=0
+
+CASE wide 1 211 8 0 up run.CsaVLIEF
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=1012.141 median_rtt_ms=447.236 median_mss=1228 total_retrans=0 total_acked_bytes=265610468
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=1365 (random=1365)
+    up_netem=7326 (random=7326)
+    fifo=0
+  measured_loss_pct (netem):
+    down=1.000
+    up=1.006
+    overall=1.005
+  direction_validation:
+    down: netem_egress_bytes=47370296 netem_random_drops=1365 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+    up:   netem_egress_bytes=992158515 netem_random_drops=7326 sender_retrans=0 sender_acked_bytes=265610468 sender_loss_pct=0.000
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=1039528811
+      down=47370296 up=992158515
+    measurement_window_useful_bytes=272758608
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=912 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=465807
+  udp_rcv_errors: hub=0 client=0
+
+CASE wide 1 211 8 0 down run.vKFJIktf
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=480.887 median_rtt_ms=248.732 median_mss=1228 total_retrans=455 total_acked_bytes=276320772
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=7629 (random=7629)
+    up_netem=1687 (random=1687)
+    fifo=0
+  measured_loss_pct (netem):
+    down=0.996
+    up=1.054
+    overall=1.006
+  direction_validation:
+    down: netem_egress_bytes=1037797988 netem_random_drops=7629 sender_retrans=455 sender_acked_bytes=276320772 sender_loss_pct=0.202
+    up:   netem_egress_bytes=55794070 netem_random_drops=1687 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=1093592058
+      down=1037797988 up=55794070
+    measurement_window_useful_bytes=287878196
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=59 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=912 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=655489960 replica_packets=512148 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=1212
+
+CASE reserve 1 101 1 0 down run.pwh7MeNu
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=33.578 median_rtt_ms=202.844 median_mss=1228 total_retrans=12 total_acked_bytes=1778144
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=24 (random=24)
+    up_netem=9 (random=9)
+    fifo=0
+  measured_loss_pct (netem):
+    down=0.997
+    up=0.935
+    overall=0.979
+  direction_validation:
+    down: netem_egress_bytes=3027739 netem_random_drops=24 sender_retrans=12 sender_acked_bytes=1778144 sender_loss_pct=0.822
+    up:   netem_egress_bytes=322527 netem_random_drops=9 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=3350266
+      down=3027739 up=322527
+    measurement_window_useful_bytes=1737620
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=218501 expired_controls=0 parity_blocks=143 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=0
+
+CASE reserve 1 101 1 0 up run.LIqySUHT
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=16.789 median_rtt_ms=203.723 median_mss=1228 total_retrans=5 total_acked_bytes=854688
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=3 (random=3)
+    up_netem=9 (random=9)
+    fifo=0
+  measured_loss_pct (netem):
+    down=0.559
+    up=0.821
+    overall=0.735
+  direction_validation:
+    down: netem_egress_bytes=170698 netem_random_drops=3 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+    up:   netem_egress_bytes=1295398 netem_random_drops=9 sender_retrans=5 sender_acked_bytes=854688 sender_loss_pct=0.713
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=1466096
+      down=170698 up=1295398
+    measurement_window_useful_bytes=849776
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=700 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=0
+
+CASE wide 1 101 8 10 down run.Y22Bfruj
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=10.793 median_rtt_ms=225.899 median_mss=1228 total_retrans=62 total_acked_bytes=4115028
+    direct: median_cwnd_KiB=8.484 median_rtt_ms=228.216 median_mss=1448 total_retrans=11 total_acked_bytes=385168
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=124 (random=124)
+    up_netem=44 (random=44)
+    fifo=1887
+  measured_loss_pct (netem):
+    down=0.921
+    up=1.113
+    overall=0.965
+  direction_validation:
+    down: netem_egress_bytes=18264739 netem_random_drops=124 sender_retrans=73 sender_acked_bytes=4500196 sender_loss_pct=2.124
+    up:   netem_egress_bytes=1040625 netem_random_drops=44 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=19305364
+      down=18264739 up=1040625
+    measurement_window_useful_bytes=4490976
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=969 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=10168320 replica_packets=7944 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=0
+
+CASE reserve 1 101 8 10 down run.UTicj7sl
+  receiver_window_s: 10.000
+  sender_deltas:
+    tunnel: median_cwnd_KiB=14.391 median_rtt_ms=204.983 median_mss=1228 total_retrans=48 total_acked_bytes=5898084
+    direct: median_cwnd_KiB=16.969 median_rtt_ms=205.198 median_mss=1448 total_retrans=4 total_acked_bytes=793504
+  tun_drops:
+    hub rx=0 tx=0
+    client rx=0 tx=0
+  qdisc_drops:
+    down_netem=75 (random=75)
+    up_netem=49 (random=49)
+    fifo=106
+  measured_loss_pct (netem):
+    down=0.923
+    up=1.031
+    overall=0.963
+  direction_validation:
+    down: netem_egress_bytes=10944395 netem_random_drops=75 sender_retrans=52 sender_acked_bytes=6691588 sender_loss_pct=1.029
+    up:   netem_egress_bytes=1270663 netem_random_drops=49 sender_retrans=0 sender_acked_bytes=0 sender_loss_pct=-
+  bytes:
+    whole_run_underlay_bytes (netem egress, excludes drops)=12215058
+      down=10944395 up=1270663
+    measurement_window_useful_bytes=7096244
+  hub_stats:
+    engine_queue_drops: socks5-awg-ext-tcp=0 socks5-awg-ext-utp=0 socks5-awg-req-tcp=0 socks5-awg-req-utp=0 socks5-awg-udp=0 socks5-wg-udp=0 tls=0
+    awg_recovery: control_bytes=26800 expired_controls=0 parity_blocks=0 recovered_packets=0 replica_bytes=0 replica_packets=0 suppressed_replicas=0
+  udp_rcv_errors: hub=0 client=0
+

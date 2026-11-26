@@ -1,0 +1,6 @@
+source HEAD (plus uncommitted local changes): 2c77c9d451aac884b138aa48b7b6ee658843b323
+go version go1.27.4-X:nodwarf5 linux/amd64
+tc utility, iproute2-7.3.0, libbpf 1.8.0
+iperf 3.22 (cJSON 1.7.15)
+Linux 7.3.4-arch1-2 #1 SMP PREEMPT_DYNAMIC Thu, 12 Nov 2026 20:11:37 +0000 x86_64
+Optional features available: CPU affinity setting, IPv6 flow label, SCTP, TCP congestion algorithm setting, sendfile / zerocopy, socket pacing, authentication, bind to device, support IPv4 don't fragment, POSIX threads, GSO/GRO support

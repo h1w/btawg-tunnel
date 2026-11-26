@@ -1,0 +1,26 @@
+suite	run	round	loss	added_RTT_ms	mode	variant	streams	direction	status	Mbit_s	ICMP_p95_ms	netem_loss_down_pct	netem_loss_up_pct	underlay_bytes_per_payload_byte	dup_hub	dup_client	retransmits	TCP	UDP_RcvbufErrors
+socks	run.tt2wAgUB	1	1	120	socks5-wg-udp	nat	1	down	ok	0.889	121.000	1.018	0.596	1.170	-	-	-	cubic-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-wg-udp	relay-cubic	1	down	ok	1.271	121.000	0.809	1.737	1.164	-	-	-	cubic-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-wg-udp	relay-bbr	1	down	ok	18.536	121.000	0.836	1.730	1.134	-	-	-	bbr-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-wg-udp	nat	8	down	ok	8.184	121.000	0.969	0.938	1.152	-	-	-	cubic-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-wg-udp	relay-cubic	8	down	ok	6.056	121.000	1.082	1.140	1.149	-	-	-	cubic-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-wg-udp	relay-bbr	8	down	ok	140.905	121.000	1.008	1.038	1.149	-	-	-	bbr-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-awg-udp	nat	1	down	ok	1.283	121.000	0.726	1.135	1.270	-	-	-	cubic-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-awg-udp	relay-cubic	1	down	ok	1.154	121.000	0.908	0.987	1.274	-	-	-	cubic-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-awg-udp	relay-bbr	1	down	ok	19.396	121.000	1.007	0.986	1.251	-	-	-	bbr-sampled	-
+socks	run.tt2wAgUB	1	1	120	socks5-awg-udp	nat	8	down	ok	6.773	121.000	0.946	0.991	1.246	-	-	-	cubic-sampled	-
+socks	run.4uz3dCgO	1	1	120	socks5-awg-udp	relay-cubic	8	down	ok	7.566	121.000	0.965	1.107	1.241	-	-	-	cubic-sampled	-
+socks	run.4uz3dCgO	1	1	120	socks5-awg-udp	relay-bbr	8	down	ok	92.672	121.000	1.029	1.013	1.232	-	-	-	bbr-sampled	-
+SUMMARY	suite	loss	added_RTT_ms	mode	variant	streams	direction	valid	total	median_Mbit_s	median_ICMP_p95_ms	median_underlay_bytes_per_payload_byte
+SUMMARY	socks	1	120	socks5-awg-udp	nat	1	down	1	1	1.283	121.000	1.270
+SUMMARY	socks	1	120	socks5-awg-udp	nat	8	down	1	1	6.773	121.000	1.246
+SUMMARY	socks	1	120	socks5-awg-udp	relay-bbr	1	down	1	1	19.396	121.000	1.251
+SUMMARY	socks	1	120	socks5-awg-udp	relay-bbr	8	down	1	1	92.672	121.000	1.232
+SUMMARY	socks	1	120	socks5-awg-udp	relay-cubic	1	down	1	1	1.154	121.000	1.274
+SUMMARY	socks	1	120	socks5-awg-udp	relay-cubic	8	down	1	1	7.566	121.000	1.241
+SUMMARY	socks	1	120	socks5-wg-udp	nat	1	down	1	1	0.889	121.000	1.170
+SUMMARY	socks	1	120	socks5-wg-udp	nat	8	down	1	1	8.184	121.000	1.152
+SUMMARY	socks	1	120	socks5-wg-udp	relay-bbr	1	down	1	1	18.536	121.000	1.134
+SUMMARY	socks	1	120	socks5-wg-udp	relay-bbr	8	down	1	1	140.905	121.000	1.149
+SUMMARY	socks	1	120	socks5-wg-udp	relay-cubic	1	down	1	1	1.271	121.000	1.164
+SUMMARY	socks	1	120	socks5-wg-udp	relay-cubic	8	down	1	1	6.056	121.000	1.149

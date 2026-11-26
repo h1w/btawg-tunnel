@@ -1,0 +1,5 @@
+run	loss	seed	seconds	receiver_bytes	Mbps	cwnd_min	cwnd_median	cwnd_max	min_rwnd	full_ticks	ticks	fast_events	fast_cuts	fast_KiB	rto_cuts	rto_KiB	idle_KiB	ledbat_up_KiB	ledbat_down_KiB	slow_up_KiB	slow_down_KiB	delay_avg_ms	delay_max_ms	above_target	ack_events	app_limited_drops	measured_up_pct	measured_down_pct	engine_drops	extra_qdisc_drops	udp_rcv_errors
+run.sxGiqhHv	0	101	12.000004	354427816	236.285	25165824	25165824.0	25165824	25159853	0	24	0	0	0.00	0	0.00	0.00	0.00	0.00	0.00	0.00	0.022	1.144	0	74228	74228	0.000	0.000	1621	0	0
+run.FJsQWrsI	1	101	11.998094	872556	0.582	10169	18605.0	35367	25147753	24	24	12	12	153.88	0	0.00	0.00	154.91	0.00	0.00	0.00	0.061	0.546	0	91	0	0.751	0.970	0	0	0
+run.zcYA1JGw	1	211	12.000000	870652	0.580	9729	18301.0	32494	25143139	23	24	15	14	172.28	0	0.00	0.00	158.43	0.00	0.00	0.00	0.041	0.328	0	103	0	0.704	1.123	0	0	0
+run.hOZH1Qu5	0	211	12.000405	214112852	142.737	25165824	25165824.0	25165824	25139775	0	24	0	0	0.00	0	0.00	0.00	0.00	0.00	0.00	0.00	0.028	2.354	0	27800	27800	0.000	0.000	2057	0	0

@@ -1,0 +1,34 @@
+round	loss	policy	client	transport	status	seconds	goodput_Mbit_s	p95_ms	last_acked	cwnd_packets	sndbuf_MiB
+1	0	reno	1	socks5-wg-udp	ok	6.241	43.012	203.000	31136577	2939	2
+1	0	reno	2	socks5-awg-udp	ok	6.312	42.529	202.000	30372336	3015	2
+1	0	reno	3	socks5-wg-udp	ok	6.333	42.387	203.000	30413497	2989	2
+1	0	bbr	1	socks5-wg-udp	ok	6.506	41.261	204.000	33535554	3668	2
+1	0	bbr	2	socks5-awg-udp	ok	6.357	42.227	204.000	30008061	3662	2
+1	0	bbr	3	socks5-wg-udp	ok	6.476	41.448	205.000	33489391	3717	2
+2	1	bbr	1	socks5-wg-udp	ok	11.671	23.001	201.000	33554547	1576	2
+2	1	bbr	2	socks5-awg-udp	ok	11.240	23.882	201.000	33327613	1618	2
+2	1	bbr	3	socks5-wg-udp	ok	11.045	24.304	201.000	32232479	1820	2
+2	1	reno	1	socks5-wg-udp	timeout	58.016	-	201.000	4660261	7	2
+2	1	reno	2	socks5-awg-udp	timeout	58.014	-	201.000	4625925	10	2
+2	1	reno	3	socks5-wg-udp	timeout	58.018	-	201.000	6266485	16	2
+3	1	reno	1	socks5-wg-udp	timeout	58.014	-	201.000	4169061	7	2
+3	1	reno	2	socks5-awg-udp	timeout	58.016	-	201.000	5075325	8	2
+3	1	reno	3	socks5-wg-udp	timeout	58.015	-	201.000	4704469	15	2
+3	1	bbr	1	socks5-wg-udp	ok	10.910	24.605	201.000	32067681	1003	2
+3	1	bbr	2	socks5-awg-udp	ok	11.499	23.344	201.000	33346379	4	2
+3	1	bbr	3	socks5-wg-udp	ok	11.581	23.178	201.000	32618229	1582	2
+4	0	bbr	1	socks5-wg-udp	ok	6.361	42.199	202.000	29982869	3705	2
+4	0	bbr	2	socks5-awg-udp	ok	6.400	41.941	203.000	29863834	3739	2
+4	0	bbr	3	socks5-wg-udp	ok	6.422	41.799	202.000	30008061	3674	2
+4	0	reno	1	socks5-wg-udp	ok	6.245	42.983	222.000	31100915	3230	2
+4	0	reno	2	socks5-awg-udp	ok	6.236	43.046	221.000	30716225	3146	2
+4	0	reno	3	socks5-wg-udp	ok	6.265	42.847	221.000	31188757	3095	2
+SUMMARY	round	loss	policy	completed	aggregate_Mbit_s	trial_seconds	max_client_p95	last_ack_total_MiB	uplink_random_pct	uplink_other_drops	engine_queue_drops	UDP_RcvbufErrors
+SUMMARY	1	0	bbr	3	123.783	6.506	205.000	92.538	0.000	0	0	0
+SUMMARY	1	0	reno	3	127.131	6.334	203.000	87.664	0.000	0	0	0
+SUMMARY	2	1	bbr	3	69.003	11.671	201.000	94.523	1.051	0	0	0
+SUMMARY	2	1	reno	0	-	58.019	201.000	14.832	0.931	0	0	0
+SUMMARY	3	1	bbr	3	69.525	11.583	201.000	93.491	1.011	0	0	0
+SUMMARY	3	1	reno	0	-	58.017	201.000	13.303	0.950	0	0	0
+SUMMARY	4	0	bbr	3	125.354	6.424	203.000	85.692	0.000	0	0	0
+SUMMARY	4	0	reno	3	128.516	6.266	222.000	88.697	0.000	0	0	0

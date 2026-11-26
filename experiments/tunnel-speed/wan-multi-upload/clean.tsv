@@ -1,0 +1,18 @@
+round	loss	policy	client	transport	status	seconds	goodput_Mbit_s	p95_ms	last_acked	cwnd_packets	sndbuf_MiB
+1	0	reno	1	socks5-wg-udp	ok	1.286	208.800	80.200	26467653	3647	2
+1	0	reno	2	socks5-awg-udp	ok	1.259	213.229	63.700	28605247	4208	2
+1	0	reno	3	socks5-wg-udp	ok	1.288	208.395	124.000	26246862	3456	2
+1	0	bbr	1	socks5-wg-udp	ok	1.119	239.922	23.300	28944415	288	2
+1	0	bbr	2	socks5-awg-udp	ok	0.987	272.058	11.000	16954295	302	2
+1	0	bbr	3	socks5-wg-udp	ok	1.069	251.098	16.600	16014349	308	2
+2	0	bbr	1	socks5-wg-udp	ok	1.095	245.185	12.700	32088869	350	2
+2	0	bbr	2	socks5-awg-udp	ok	1.052	255.235	15.000	16330431	356	2
+2	0	bbr	3	socks5-wg-udp	ok	1.100	243.933	10.900	32405693	346	2
+2	0	reno	1	socks5-wg-udp	ok	1.248	215.174	78.600	27497480	4993	2
+2	0	reno	2	socks5-awg-udp	ok	1.214	221.103	81.800	29463991	3882	2
+2	0	reno	3	socks5-wg-udp	ok	1.238	216.871	78.800	28160481	3423	2
+SUMMARY	round	loss	policy	completed	aggregate_Mbit_s	trial_seconds	max_client_p95	last_ack_total_MiB	uplink_random_pct	uplink_other_drops	engine_queue_drops	UDP_RcvbufErrors
+SUMMARY	1	0	bbr	3	719.765	1.119	23.300	59.045	0.000	0	0	0
+SUMMARY	1	0	reno	3	624.672	1.289	124.000	77.553	0.000	0	0	0
+SUMMARY	2	0	bbr	3	731.062	1.102	15.000	77.081	0.000	0	0	0
+SUMMARY	2	0	reno	3	645.522	1.248	81.800	81.179	0.000	0	0	0

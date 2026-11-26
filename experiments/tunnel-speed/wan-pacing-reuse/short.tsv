@@ -1,0 +1,7 @@
+run	loss	variant	valid	median_TTFB_ms	p95_TTFB_ms	median_complete_ms	p95_complete_ms	median_prime_ms
+run.t39fmiX7	0	bulk-prime	12	201.435	201.824	203.067	203.369	2378.171
+run.t39fmiX7	0	cold	12	402.178	407.742	942.146	947.994	0.000
+run.t39fmiX7	0	tiny-prime	12	201.255	201.341	711.147	711.245	401.918
+run.t39fmiX7	1	bulk-prime	12	201.409	201.588	203.146	403.808	3323.666
+run.t39fmiX7	1	cold	12	402.072	1453.588	952.412	2585.838	0.000
+run.t39fmiX7	1	tiny-prime	12	201.245	201.503	716.515	884.086	402.023

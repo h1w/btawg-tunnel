@@ -1,0 +1,167 @@
+run.LHQCiNn7 control 48286 data_ports 44830 44844 44860 44862 48298 48308 48322 48326 status interrupt - the client has terminated by signal Terminated(15)
+iperf block 131072 goodput 0
++2.877 client TCP received=63856 unread=0 by_stream=[0, 12280, 12280, 2456, 12280, 12280, 0, 12280] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++3.975 client TCP received=207532 unread=0 by_stream=[13508, 36840, 36840, 15964, 38068, 15964, 13508, 36840] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++5.891 client TCP received=372084 unread=0 by_stream=[39296, 36840, 36840, 39296, 85960, 39296, 39296, 55260] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++7.832 client TCP received=458044 unread=0 by_stream=[39296, 76136, 60172, 39296, 88416, 39296, 39296, 76136] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++8.942 client TCP received=494884 unread=0 by_stream=[39296, 76136, 79820, 44208, 88416, 51576, 39296, 76136] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++9.769 client TCP received=539092 unread=0 by_stream=[39296, 76136, 79820, 63856, 88416, 76136, 39296, 76136] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++11.979 client TCP received=706100 unread=23656 by_stream=[78592, 76136, 79820, 77364, 154728, 77364, 81048, 81048] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 2, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 2, 'bytes_acked': 4, 'bytes_received': 201})
++15.828 client TCP received=968892 unread=41820 by_stream=[82276, 131396, 144904, 111748, 158412, 131396, 84732, 124028] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 4, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 4, 'bytes_acked': 4, 'bytes_received': 201})
++23.995 client TCP received=1490792 unread=442216 by_stream=[144904, 214900, 232092, 142448, 262792, 146132, 152272, 195252] ctrl_client=('ESTAB', 0, 1336, {'bytes_retrans': 108, 'bytes_acked': 202, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1368, {'bytes_retrans': 5, 'bytes_acked': 5, 'bytes_received': 1537})
++26.709 client TCP received=1753584 unread=705008 by_stream=[146132, 214900, 243144, 230864, 264020, 230864, 225952, 197708] ctrl_client=('ESTAB', 0, 1336, {'bytes_retrans': 112, 'bytes_acked': 202, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1368, {'bytes_retrans': 5, 'bytes_acked': 5, 'bytes_received': 1537})
+client trace {}
+run.qhQ1I3GH control 38034 data_ports 38044 38050 44922 44934 44936 44946 44962 44978 status interrupt - the client has terminated by signal Terminated(15)
+iperf block 131072 goodput 0
++2.896 client TCP received=23332 unread=0 by_stream=[12280, 0, 0, 0, 0, 2456, 8596, 0] ctrl_client=('ESTAB', 0, 0, {'bytes_retrans': 37, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++3.990 client TCP received=72452 unread=0 by_stream=[12280, 12280, 0, 12280, 0, 12280, 12280, 11052] ctrl_client=('ESTAB', 0, 0, {'bytes_retrans': 37, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++5.901 client TCP received=187884 unread=0 by_stream=[36840, 23332, 13508, 13508, 13508, 36840, 36840, 13508] ctrl_client=('ESTAB', 0, 0, {'bytes_retrans': 37, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++7.832 client TCP received=338928 unread=0 by_stream=[63856, 39296, 39296, 39296, 39296, 39296, 39296, 39296] ctrl_client=('ESTAB', 0, 0, {'bytes_retrans': 37, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++8.917 client TCP received=435940 unread=0 by_stream=[79820, 45436, 39296, 39296, 39296, 78592, 74908, 39296] ctrl_client=('ESTAB', 0, 0, {'bytes_retrans': 37, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++9.735 client TCP received=491200 unread=0 by_stream=[79820, 76136, 39296, 63856, 39296, 78592, 74908, 39296] ctrl_client=('ESTAB', 0, 0, {'bytes_retrans': 37, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++11.906 client TCP received=660664 unread=0 by_stream=[108064, 76136, 90872, 77364, 78592, 78592, 74908, 76136] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 38, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 2, 'bytes_acked': 4, 'bytes_received': 201})
++15.979 client TCP received=921000 unread=13252 by_stream=[132624, 136308, 90872, 130168, 82276, 137536, 130168, 81048] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 40, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 4, 'bytes_acked': 4, 'bytes_received': 201})
++23.885 client TCP received=1476056 unread=427480 by_stream=[212444, 225952, 163324, 144904, 147360, 227180, 213672, 141220] ctrl_client=('ESTAB', 0, 1316, {'bytes_retrans': 124, 'bytes_acked': 202, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1370, {'bytes_retrans': 5, 'bytes_acked': 5, 'bytes_received': 1517})
++26.605 client TCP received=1587804 unread=539228 by_stream=[214900, 225952, 163324, 230864, 147360, 227180, 213672, 164552] ctrl_client=('ESTAB', 0, 1316, {'bytes_retrans': 124, 'bytes_acked': 202, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1370, {'bytes_retrans': 5, 'bytes_acked': 5, 'bytes_received': 1517})
+client trace {}
+run.6vz677J2 control 35260 data_ports 35266 35280 35294 35306 35312 35314 35320 35322 status interrupt - the client has terminated by signal Terminated(15)
+iperf block 131072 goodput 0
++2.853 client TCP received=67540 unread=0 by_stream=[12280, 12280, 12280, 12280, 12280, 6140, 0, 0] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++3.942 client TCP received=213672 unread=0 by_stream=[36840, 36840, 36840, 36840, 25788, 13508, 13508, 13508] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++5.848 client TCP received=370856 unread=0 by_stream=[76136, 66312, 36840, 39296, 36840, 36840, 39296, 39296] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++7.746 client TCP received=466640 unread=0 by_stream=[76136, 77364, 85960, 69996, 39296, 39296, 39296, 39296] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++8.834 client TCP received=537864 unread=0 by_stream=[76136, 77364, 85960, 85960, 79820, 54032, 39296, 39296] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++9.920 client TCP received=622596 unread=0 by_stream=[77364, 77364, 85960, 85960, 79820, 76136, 83504, 56488] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 200})
++11.828 client TCP received=773640 unread=0 by_stream=[117888, 126484, 111748, 89644, 83504, 78592, 84732, 81048] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 2, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 2, 'bytes_acked': 4, 'bytes_received': 201})
++15.924 client TCP received=1089236 unread=104772 by_stream=[120344, 126484, 155956, 184200, 144904, 136308, 138764, 82276] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 4, 'bytes_acked': 201, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 4, 'bytes_acked': 4, 'bytes_received': 201})
++23.807 client TCP received=1315188 unread=266612 by_stream=[181744, 185428, 165780, 191568, 151044, 139992, 154728, 144904] ctrl_client=('ESTAB', 0, 1316, {'bytes_retrans': 88, 'bytes_acked': 202, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1370, {'bytes_retrans': 5, 'bytes_acked': 5, 'bytes_received': 1517})
++27.884 client TCP received=1582892 unread=534316 by_stream=[182972, 200164, 261564, 313140, 185428, 139992, 154728, 144904] ctrl_client=('ESTAB', 0, 1316, {'bytes_retrans': 88, 'bytes_acked': 202, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1370, {'bytes_retrans': 5, 'bytes_acked': 5, 'bytes_received': 1517})
+client trace {'read_enter': 8, 'send_state_enter': 1, 'send_state_exit': 1, 'read_exit': 8, 'exchange_enter': 1}
++10.347073 send_state_enter 4 0
++10.347105 send_state_exit 4 0
++12.062696 read_exit 8 131072
++12.867074 read_exit 10 131072
++14.877488 read_exit 12 131072
++15.683386 read_exit 14 131072
++15.886347 read_exit 16 131072
++17.858996 read_exit 18 131072
++18.529248 read_exit 4 131072
++19.132814 exchange_enter 0 0
++20.141401 read_exit 6 131072
+by 8s client read blocks=0 returned_bytes=0
+by 9s client read blocks=0 returned_bytes=0
+by 12s client read blocks=0 returned_bytes=0
+by 20s client read blocks=7 returned_bytes=917504
+by 28s client read blocks=8 returned_bytes=1048576
+hub trace {'send_state_enter': 7, 'send_state_exit': 7, 'exchange_enter': 1, 'exchange_exit': 1}
+-0.099572 send_state_enter 9 0
+-0.099511 send_state_exit 9 0
++0.101255 send_state_enter 10 0
++0.101277 send_state_exit 10 0
++2.245642 send_state_enter 1 0
++2.245685 send_state_exit 1 0
++2.245693 send_state_enter 2 0
++2.245700 send_state_exit 2 0
++10.447549 send_state_enter 13 0
++10.447571 send_state_exit 13 0
++10.447573 exchange_enter 0 0
++19.234327 exchange_exit 0 0
++19.234341 send_state_enter 14 0
++19.234352 send_state_exit 14 0
++28.694465 send_state_enter -2 0
++28.694486 send_state_exit -2 0
+by 8s hub read blocks=0 returned_bytes=0
+by 9s hub read blocks=0 returned_bytes=0
+by 12s hub read blocks=0 returned_bytes=0
+by 20s hub read blocks=0 returned_bytes=0
+by 28s hub read blocks=0 returned_bytes=0
+run.pplNl8Ad control 57452 data_ports 57454 57466 57480 57490 57494 57510 57516 57528 status interrupt - the client has terminated by signal Terminated(15)
+iperf block 4096 goodput 131958.328101221
++2.859 client TCP received=116272 unread=0 by_stream=[11464, 11464, 11464, 36024, 11464, 11464, 11464, 11464] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 198})
++3.944 client TCP received=235388 unread=0 by_stream=[36024, 36024, 16376, 37252, 36024, 36024, 24972, 12692] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 198})
++5.843 client TCP received=377836 unread=0 by_stream=[45848, 38480, 38480, 75320, 65496, 38480, 38480, 37252] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 198})
++7.743 client TCP received=495724 unread=0 by_stream=[80232, 63040, 38480, 76548, 82688, 77776, 38480, 38480] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 198})
++8.831 client TCP received=538704 unread=0 by_stream=[80232, 85144, 43392, 76548, 82688, 79004, 53216, 38480] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 198})
++9.918 client TCP received=629576 unread=0 by_stream=[80232, 85144, 79004, 76548, 82688, 79004, 75320, 71636] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_acked': 4, 'bytes_received': 198})
++11.835 client TCP received=780620 unread=125720 by_stream=[115844, 88828, 81460, 118300, 131808, 82688, 79004, 82688] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 2, 'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 2, 'bytes_acked': 4, 'bytes_received': 199})
++15.934 client TCP received=1091304 unread=435944 by_stream=[136720, 152684, 142860, 121984, 135492, 142860, 135492, 123212] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 4, 'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 4, 'bytes_acked': 4, 'bytes_received': 199})
++23.826 client TCP received=1536365 unread=881005 by_stream=[221452, 230048, 149000, 180225, 215312, 238644, 152684, 149000] ctrl_client=('ESTAB', 0, 1364, {'bytes_retrans': 136, 'bytes_acked': 200, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1359, {'bytes_retrans': 5, 'bytes_acked': 5, 'bytes_received': 1563})
++26.272 client TCP received=1684953 unread=1029593 by_stream=[221452, 254608, 203032, 180225, 215312, 238644, 220224, 151456] ctrl_client=('ESTAB', 0, 1364, {'bytes_retrans': 140, 'bytes_acked': 200, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1359, {'bytes_retrans': 9, 'bytes_acked': 5, 'bytes_received': 1563})
+client trace {'read_enter': 160, 'read_exit': 160, 'send_state_enter': 2, 'send_state_exit': 2, 'exchange_enter': 1, 'exchange_exit': 1}
++10.009071 send_state_enter 4 0
++10.009132 send_state_exit 4 0
++16.290673 exchange_enter 0 0
++26.300048 exchange_exit 0 -1
++26.300337 send_state_enter 16 0
++26.300351 send_state_exit 16 0
+by 8s client read blocks=121 returned_bytes=495616
+by 9s client read blocks=133 returned_bytes=544768
+by 12s client read blocks=159 returned_bytes=651264
+by 20s client read blocks=160 returned_bytes=655360
+by 28s client read blocks=160 returned_bytes=655360
+hub trace {'send_state_enter': 6, 'send_state_exit': 6, 'exchange_enter': 1, 'exchange_exit': 1}
+-0.100229 send_state_enter 9 0
+-0.100192 send_state_exit 9 0
++0.101156 send_state_enter 10 0
++0.101179 send_state_exit 10 0
++1.908372 send_state_enter 1 0
++1.908398 send_state_exit 1 0
++1.908407 send_state_enter 2 0
++1.908414 send_state_exit 2 0
++10.110154 send_state_enter 13 0
++10.110187 send_state_exit 13 0
++10.110190 exchange_enter 0 0
++16.593989 exchange_exit 0 0
++16.594013 send_state_enter 14 0
++16.594023 send_state_exit 14 0
+by 8s hub read blocks=0 returned_bytes=0
+by 9s hub read blocks=0 returned_bytes=0
+by 12s hub read blocks=0 returned_bytes=0
+by 20s hub read blocks=0 returned_bytes=0
+by 28s hub read blocks=0 returned_bytes=0
+run.5uwDg467 control 39282 data_ports 39284 39286 39288 39296 39310 39312 39320 39334 status interrupt - the client has terminated by signal Terminated(15)
+iperf block 4096 goodput 137920.6600123147
++2.869 client TCP received=9008 unread=0 by_stream=[0, 9008, 0, 0, 0, 0, 0, 0] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 2, {'bytes_acked': 2, 'bytes_received': 198})
++3.957 client TCP received=52408 unread=0 by_stream=[11464, 11464, 11464, 0, 11464, 6552, 0, 0] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_retrans': 1, 'bytes_acked': 4, 'bytes_received': 198})
++5.865 client TCP received=164164 unread=0 by_stream=[28656, 36024, 36024, 12692, 12692, 12692, 12692, 12692] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_retrans': 1, 'bytes_acked': 4, 'bytes_received': 198})
++7.772 client TCP received=300472 unread=0 by_stream=[36024, 36024, 38480, 38480, 38480, 36024, 38480, 38480] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_retrans': 1, 'bytes_acked': 4, 'bytes_received': 198})
++8.865 client TCP received=390116 unread=0 by_stream=[40936, 85144, 71636, 38480, 38480, 38480, 38480, 38480] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_retrans': 1, 'bytes_acked': 4, 'bytes_received': 198})
++9.954 client TCP received=451516 unread=0 by_stream=[85144, 85144, 85144, 38480, 42164, 38480, 38480, 38480] ctrl_client=('ESTAB', 0, 0, {'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 0, {'bytes_retrans': 1, 'bytes_acked': 4, 'bytes_received': 198})
++11.866 client TCP received=608700 unread=114084 by_stream=[85144, 85144, 85144, 38480, 85144, 85144, 85144, 59356] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 1, 'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 1, 'bytes_acked': 4, 'bytes_received': 199})
++15.959 client TCP received=877632 unread=377920 by_stream=[134264, 160052, 150228, 83916, 90056, 90056, 90056, 79004] ctrl_client=('ESTAB', 0, 1, {'bytes_retrans': 3, 'bytes_acked': 199, 'bytes_received': 4}) ctrl_hub=('ESTAB', 0, 1, {'bytes_retrans': 3, 'bytes_acked': 4, 'bytes_received': 199})
++23.855 client TCP received=1419852 unread=920140 by_stream=[173560, 271800, 236188, 119552, 160052, 162508, 164964, 131228] ctrl_client=('ESTAB', 0, 1369, {'bytes_retrans': 141, 'bytes_acked': 200, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1368, {'bytes_retrans': 4, 'bytes_acked': 5, 'bytes_received': 1568})
++27.155 client TCP received=1543880 unread=1044168 by_stream=[260748, 271800, 248468, 119552, 184612, 162508, 164964, 131228] ctrl_client=('ESTAB', 0, 1369, {'bytes_retrans': 141, 'bytes_acked': 200, 'bytes_received': 5}) ctrl_hub=('ESTAB', 0, 1368, {'bytes_retrans': 4, 'bytes_acked': 5, 'bytes_received': 1568})
+client trace {'read_enter': 122, 'read_exit': 122, 'send_state_enter': 2, 'send_state_exit': 2, 'exchange_enter': 1, 'exchange_exit': 1}
++10.582076 send_state_enter 4 0
++10.582115 send_state_exit 4 0
++17.283402 exchange_enter 0 0
++27.293051 exchange_exit 0 -1
++27.293453 send_state_enter 16 0
++27.293469 send_state_exit 16 0
+by 8s client read blocks=73 returned_bytes=299008
+by 9s client read blocks=91 returned_bytes=372736
+by 12s client read blocks=118 returned_bytes=483328
+by 20s client read blocks=122 returned_bytes=499712
+by 28s client read blocks=122 returned_bytes=499712
+hub trace {'send_state_enter': 7, 'send_state_exit': 7, 'exchange_enter': 1, 'exchange_exit': 1}
+-0.100759 send_state_enter 9 0
+-0.100688 send_state_exit 9 0
++0.100891 send_state_enter 10 0
++0.100914 send_state_exit 10 0
++2.480812 send_state_enter 1 0
++2.480843 send_state_exit 1 0
++2.480851 send_state_enter 2 0
++2.480858 send_state_exit 2 0
++10.682651 send_state_enter 13 0
++10.682679 send_state_exit 13 0
++10.682682 exchange_enter 0 0
++17.384744 exchange_exit 0 0
++17.384752 send_state_enter 14 0
++17.384761 send_state_exit 14 0
++27.489454 send_state_enter -2 0
++27.489476 send_state_exit -2 0
+by 8s hub read blocks=0 returned_bytes=0
+by 9s hub read blocks=0 returned_bytes=0
+by 12s hub read blocks=0 returned_bytes=0
+by 20s hub read blocks=0 returned_bytes=0
+by 28s hub read blocks=0 returned_bytes=0

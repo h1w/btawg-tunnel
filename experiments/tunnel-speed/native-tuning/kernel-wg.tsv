@@ -1,0 +1,5 @@
+loss	mode	cc	streams	direction	status	mbps	retransmits
+0	kernel-wg-default-offloads	cubic	8	up	ok	762.466618048893	0
+0	kernel-wg-default-offloads	cubic	8	down	ok	763.5061389068858	0
+1	kernel-wg-offloads-off	cubic	8	up	ok	849.9469598591608	6882
+1	kernel-wg-offloads-off	cubic	8	down	ok	723.9182571417	6000

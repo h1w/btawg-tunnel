@@ -1,0 +1,5 @@
+series	arm	seed	run	managed	loss_pct	added_rtt_ms	mode	streams	direction	status	Mbps	ping_p95_ms	hub_engine_drops	client_tun_drops	netem_random	netem_other	hub_udp_rcv_errors	client_udp_rcv_errors	endpoint_qdisc_drops	endpoint_link_drops	error
+final-timer	current	101	run.HhbjJoHw	1	1	200	socks5-awg-ext-utp	8	down	ok	0.617	4007.00	0	0	16	0	0	0	0	0	
+final-timer	current	101	run.HhbjJoHw	1	1	200	socks5-awg-ext-utp	8	up	ok	0.568	5421.00	0	0	26	0	0	0	0	0	
+final-timer	current	101	run.HhbjJoHw	1	1	200	socks5-awg-req-utp	8	down	ok	0.393	4406.00	0	0	19	0	0	0	0	0	
+final-timer	current	101	run.HhbjJoHw	1	1	200	socks5-awg-req-utp	8	up	ok	0.599	6642.00	0	0	37	0	0	0	0	0	

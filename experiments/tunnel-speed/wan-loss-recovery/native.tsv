@@ -1,0 +1,39 @@
+run	profile	RTT_add_ms	mode	controller	streams	direction	Mbit_s	p95_ms	cwnd_KiB	late_sndbuf_limited_pct	retrans	netem_down_pct	netem_up_pct	UDP_RcvbufErrors	IPv4_fragments
+run.LSB3bkPf	1-base-1	120	socks5-wg-udp	cubic	1	down	1.049	121.000	16.189	0	9	0.793	1.108	0	0
+run.LSB3bkPf	2-shim-1	120	socks5-wg-udp	cubic	1	down	1.049	121.000	16.789	0	10	0.885	1.314	0	0
+run.LSB3bkPf	3-fec8-1	120	socks5-wg-udp	cubic	1	down	17.302	121.000	199.070	0	10	0.987	0.980	0	0
+run.LSB3bkPf	4-fec16x2-1	120	socks5-wg-udp	cubic	1	down	43.253	122.000	516.264	0	21	0.995	1.056	0	0
+run.LSB3bkPf	5-fec12x2-1	120	socks5-wg-udp	cubic	1	down	66.716	121.000	1006.744	0	3	0.988	1.013	0	0
+FEC	run.LSB3bkPf	2-shim-1	socks5-wg-udp	hub	plain	3276	recovered	0	wire_overhead_pct	0.000	local_drop	0
+FEC	run.LSB3bkPf	2-shim-1	socks5-wg-udp	client	plain	1370	recovered	0	wire_overhead_pct	0.000	local_drop	0
+FEC	run.LSB3bkPf	3-fec8-1	socks5-wg-udp	hub	plain	32503	recovered	103	wire_overhead_pct	13.403	local_drop	0
+FEC	run.LSB3bkPf	3-fec8-1	socks5-wg-udp	client	plain	11973	recovered	298	wire_overhead_pct	24.261	local_drop	0
+FEC	run.LSB3bkPf	4-fec16x2-1	socks5-wg-udp	hub	plain	61737	recovered	242	wire_overhead_pct	13.383	local_drop	0
+FEC	run.LSB3bkPf	4-fec16x2-1	socks5-wg-udp	client	plain	22729	recovered	594	wire_overhead_pct	24.289	local_drop	0
+FEC	run.LSB3bkPf	5-fec12x2-1	socks5-wg-udp	hub	plain	88370	recovered	362	wire_overhead_pct	17.579	local_drop	0
+FEC	run.LSB3bkPf	5-fec12x2-1	socks5-wg-udp	client	plain	35896	recovered	868	wire_overhead_pct	28.936	local_drop	0
+run.gh64FBoI	1-base-1	120	socks5-wg-udp	bbr	1	down	94.370	121.000	4500.668	34.900	1313	0.999	0.981	0	0
+run.gh64FBoI	2-fec12x2-1	120	socks5-wg-udp	bbr	1	down	160.065	121.000	5999.691	27.000	19	1.012	0.993	0	0
+FEC	run.gh64FBoI	2-fec12x2-1	socks5-wg-udp	hub	plain	317305	recovered	1310	wire_overhead_pct	17.568	local_drop	0
+FEC	run.gh64FBoI	2-fec12x2-1	socks5-wg-udp	client	plain	132699	recovered	3172	wire_overhead_pct	28.888	local_drop	0
+run.FwPA0qh2	1-fec12x2-1	120	socks5-wg-udp	bbr	1	down	365.279	194.000	13063.090	0	13921	1.023	0.989	28453	0
+run.FwPA0qh2	2-base-1	120	socks5-wg-udp	bbr	1	down	369.099	124.000	25524.172	0	5487	1.017	0.882	1587	0
+run.FwPA0qh2	3-base-0	120	socks5-wg-udp	bbr	1	down	652.440	227.000	22156.766	0	0	0.000	0.000	0	0
+FEC	run.FwPA0qh2	1-fec12x2-1	socks5-wg-udp	hub	plain	716977	recovered	1945	wire_overhead_pct	17.560	local_drop	0
+FEC	run.FwPA0qh2	1-fec12x2-1	socks5-wg-udp	client	plain	198710	recovered	7284	wire_overhead_pct	28.706	local_drop	0
+run.DPdKuVLo	1-shim-1	120	socks5-awg-udp	cubic	1	down	1.049	121.000	14.391	0	9	0.825	1.050	0	0
+run.DPdKuVLo	2-fec12x2-1	120	socks5-awg-udp	cubic	1	down	98.333	122.000	1441.461	0	2	1.013	0.922	0	0
+run.DPdKuVLo	3-fec16x2-1	120	socks5-awg-udp	cubic	1	down	53.012	123.000	537.250	0	270	1.012	0.994	0	0
+FEC	run.DPdKuVLo	1-shim-1	socks5-awg-udp	hub	plain	3999	recovered	0	wire_overhead_pct	0.000	local_drop	0
+FEC	run.DPdKuVLo	1-shim-1	socks5-awg-udp	client	plain	1340	recovered	0	wire_overhead_pct	0.000	local_drop	0
+FEC	run.DPdKuVLo	2-fec12x2-1	socks5-awg-udp	hub	plain	128902	recovered	510	wire_overhead_pct	17.548	local_drop	0
+FEC	run.DPdKuVLo	2-fec12x2-1	socks5-awg-udp	client	plain	55698	recovered	1296	wire_overhead_pct	29.682	local_drop	0
+FEC	run.DPdKuVLo	3-fec16x2-1	socks5-awg-udp	hub	plain	98435	recovered	399	wire_overhead_pct	13.352	local_drop	0
+FEC	run.DPdKuVLo	3-fec16x2-1	socks5-awg-udp	client	plain	40528	recovered	976	wire_overhead_pct	23.662	local_drop	0
+run.JeMEXKj7	1-shim-0	120	socks5-wg-udp	bbr	1	down	401.722	186.000	15923.227	0	11819	0.000	0.000	27778	0
+run.JeMEXKj7	2-fec12x2-0	120	socks5-wg-udp	bbr	1	down	366.770	188.000	12474.273	0	2098	0.000	0.000	17467	0
+FEC	run.JeMEXKj7	1-shim-0	socks5-wg-udp	hub	plain	555509	recovered	0	wire_overhead_pct	0.000	local_drop	0
+FEC	run.JeMEXKj7	1-shim-0	socks5-wg-udp	client	plain	173926	recovered	0	wire_overhead_pct	0.000	local_drop	0
+FEC	run.JeMEXKj7	2-fec12x2-0	socks5-wg-udp	hub	plain	507146	recovered	0	wire_overhead_pct	17.560	local_drop	0
+FEC	run.JeMEXKj7	2-fec12x2-0	socks5-wg-udp	client	plain	197145	recovered	0	wire_overhead_pct	28.769	local_drop	0
+VERIFIED 15 trials

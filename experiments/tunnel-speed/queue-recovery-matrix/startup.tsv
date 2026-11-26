@@ -1,0 +1,17 @@
+arm	run	seed	status	startup_ms	no_carrier_sends	AWG_handshake_retries	capture_drops
+sackdup	run.FmZHMrHO	101	ready	6031	1	1	0
+sackdup	run.iIq78I3P	211	ready	9404	1	1	0
+sackdup	run.0tlSq2oB	101	ready	6187	1	1	0
+sackdup	run.bD77NF9y	211	ready	8092	1	1	0
+sackdup	run.7Rusx31v	311	ready	6116	1	1	0
+sackdup	run.VbL5KlMd	411	ready	5988	1	1	0
+sackdup	run.rGZYYbHo	511	ready	6013	1	1	0
+sackdup	run.n858nXuc	611	ready	5952	1	1	0
+attach-first	run.cVm2FDZI	101	ready	1469	0	0	0
+attach-first	run.u65UtvpW	211	ready	3853	0	0	0
+attach-first	run.XuUJQSlQ	101	ready	1464	0	0	0
+attach-first	run.cohcUX7o	211	ready	1467	0	0	0
+attach-first	run.B3gK7vxE	311	ready	1462	0	0	0
+attach-first	run.t9wcvTFA	411	ready	1461	0	0	0
+attach-first	run.7UtgKJST	511	ready	1461	0	0	0
+attach-first	run.VnfCS9R8	611	ready	1459	0	0	0

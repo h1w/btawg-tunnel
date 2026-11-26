@@ -1,0 +1,7 @@
+arm	loss	seed	run	seconds	receiver_bytes	Mbps	hub_engine_drops	random_drops	extra_drops
+baseline	1	101	run.YI3qMPnI	11.999998	873108	0.582	0	29	0
+quiet	1	101	run.O4I1eTMq	11.999997	2252404	1.502	0	70	0
+quiet	1	211	run.3q6x1ShN	11.999987	2187068	1.458	0	68	0
+baseline	1	211	run.GT6GVEuX	11.999997	908720	0.606	0	26	0
+baseline	c	101	run.dF9XQiFd	11.999972	3740488	2.494	364	0	216
+quiet	c	101	run.VOz83BDg	12.000002	4981996	3.321	683	0	386

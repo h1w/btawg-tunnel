@@ -1,0 +1,90 @@
+[run.8IJdzURE +0 ms RTT]
+round loss mode cc n direction goodput_Mbps retrans cwnd_KiB tcpRTT_ms ICMPp95_ms udp_sent_Mbps udp_loss_pct netem_pct(client/hub) UDP_rcv_errors(hub/cli) tun_err_drop(hub/cli) fragments CPU_temp_C CPU_MHz
+1 0 wg cubic 1 down 836.8 59 503.7 5.434 5.72 - - 0.00/0.00 0/0 0/0 0/0/0 72.4 3892
+1 0 wg cubic 8 down 861.4 163 233.8 16.778 28.00 - - 0.00/0.00 0/0 0/0 0/0/0 76.4 3891
+1 0 wg bbr 1 down 850.7 0 412.5 3.631 4.71 - - 0.00/0.00 0/0 0/0 0/0/0 80.1 3892
+1 0 wg bbr 8 down 858.5 0 121.1 9.194 15.40 - - 0.00/0.00 0/0 0/0 0/0/0 82.8 3891
+1 0 wg udp 1 down 748.6 - - - 1.12 750.00 0.18 0.00/0.00 0/599 0/0 0/0/0 81.8 3892
+1 0 awg cubic 1 down 811.6 295 1000.7 8.562 14.40 - - 0.00/0.00 0/0 0/0 0/0/0 86.1 3880
+1 0 awg cubic 8 down 823.6 1794 211.1 16.286 32.70 - - 0.00/0.00 0/0 0/0 0/0/0 88.1 3892
+1 0 awg bbr 1 down 812.4 0 335.8 3.334 4.92 - - 0.00/0.00 0/0 0/0 0/0/0 89.8 3882
+1 0 awg bbr 8 down 813.8 0 129.5 9.330 14.20 - - 0.00/0.00 0/0 0/0 0/0/0 90.5 3891
+1 0 awg udp 1 down 744.8 - - - 2.67 750.00 0.70 0.00/0.00 0/2828 0/0 0/0/0 88.9 3891
+2 1 wg cubic 1 down 95.9 379 2.4 0.370 0.81 - - 0.93/0.89 0/0 0/0 0/0/0 82.2 3880
+2 1 wg cubic 8 down 556.8 2332 4.8 0.736 0.98 - - 1.03/1.01 0/0 0/0 0/0/0 85.5 3892
+2 1 wg bbr 1 down 994.1 4141 455.7 3.731 4.63 - - 1.02/0.93 0/0 0/0 0/0/0 87.2 3893
+2 1 wg bbr 8 down 982.3 4235 137.3 8.976 11.90 - - 1.00/1.03 0/0 0/0 0/0/0 87.9 3893
+2 1 wg udp 1 down 736.6 - - - 4.08 749.99 1.80 0.99/0.00 0/3534 0/0 0/0/0 87.0 3891
+2 1 awg cubic 1 down 103.3 421 2.4 0.317 0.90 - - 1.01/0.91 0/0 0/0 0/0/0 82.9 3879
+2 1 awg cubic 8 down 525.7 2234 3.6 0.589 0.90 - - 1.04/1.02 0/0 0/0 0/0/0 87.0 3892
+2 1 awg bbr 1 down 1006.1 4183 446.1 3.254 4.89 - - 1.00/1.03 0/0 0/0 0/0/0 89.0 3892
+2 1 awg bbr 8 down 978.3 4346 163.1 8.241 12.90 - - 1.02/0.94 0/0 0/0 0/0/0 89.0 3886
+2 1 awg udp 1 down 738.4 - - - 2.24 750.00 1.55 1.01/0.00 0/3370 0/0 0/0/0 88.2 3893
+3 1 wg cubic 1 down 104.6 422 2.4 0.227 0.69 - - 0.98/0.94 0/0 0/0 0/0/0 81.9 3892
+3 1 wg cubic 8 down 545.8 2290 4.2 0.631 0.61 - - 1.02/1.00 0/0 0/0 0/0/0 85.2 3892
+3 1 wg bbr 1 down 1010.0 4136 508.5 3.587 4.70 - - 1.00/1.03 0/0 0/0 0/0/0 88.0 3892
+3 1 wg bbr 8 down 994.1 4049 124.7 8.231 11.10 - - 0.99/0.98 0/0 0/0 0/0/0 90.2 3892
+3 1 wg udp 1 down 736.6 - - - 1.89 750.01 1.79 0.97/0.00 0/2783 0/0 0/0/0 88.9 3891
+3 1 awg cubic 1 down 110.4 417 3.0 0.380 0.67 - - 0.94/0.91 0/0 0/0 0/0/0 84.1 3889
+3 1 awg cubic 8 down 542.4 2148 4.8 0.738 0.93 - - 0.97/1.05 0/0 0/0 0/0/0 86.4 3892
+3 1 awg bbr 1 down 1002.4 4144 480.9 3.912 5.37 - - 1.02/1.00 0/0 0/0 0/0/0 88.9 3891
+3 1 awg bbr 8 down 983.1 4225 162.5 10.142 12.70 - - 1.01/1.01 0/0 0/0 0/0/0 91.0 3892
+3 1 awg udp 1 down 741.7 - - - 1.01 750.00 1.11 0.99/0.00 0/515 0/0 0/0/0 89.9 3892
+4 0 wg cubic 1 down 857.0 55 532.5 4.508 6.10 - - 0.00/0.00 0/0 0/0 0/0/0 93.2 3892
+4 0 wg cubic 8 down 859.3 9035 1638.7 114.447 196.00 - - 0.00/0.00 0/0 0/0 0/0/0 94.1 3892
+4 0 wg bbr 1 down 841.7 0 398.1 2.963 4.17 - - 0.00/0.00 0/0 0/0 0/0/0 95.5 3887
+4 0 wg bbr 8 down 862.1 258 130.7 8.009 12.80 - - 0.00/0.00 0/0 0/0 0/0/0 96.4 3880
+4 0 wg udp 1 down 749.4 - - - 0.66 750.02 0.08 0.00/0.00 0/378 0/0 0/0/0 94.9 3892
+4 0 awg cubic 1 down 813.2 61 631.4 6.160 8.05 - - 0.00/0.00 0/0 0/0 0/0/0 97.2 3868
+4 0 awg cubic 8 down 831.5 9752 612.8 40.132 144.00 - - 0.00/0.00 0/0 0/0 0/0/0 97.5 3878
+4 0 awg bbr 1 down 811.8 0 399.3 2.941 4.27 - - 0.00/0.00 0/0 0/0 0/0/0 97.8 3868
+INVALID 4-loss-0-socks5-awg-udp-bbr-8-down interrupt - the client has terminated by signal Terminated(15)
+4 0 awg udp 1 down 749.2 - - - 1.04 750.00 0.10 0.00/0.00 0/409 0/0 0/0/0 78.8 3891
+VERIFIED 39 valid of 40 trials
+[run.ImiQLXGx +120 ms RTT]
+round loss mode cc n direction goodput_Mbps retrans cwnd_KiB tcpRTT_ms ICMPp95_ms udp_sent_Mbps udp_loss_pct netem_pct(client/hub) UDP_rcv_errors(hub/cli) tun_err_drop(hub/cli) fragments CPU_temp_C CPU_MHz
+1 1 awg bbr 8 down 717.0 5288 4693.7 123.346 158.00 - - 1.02/0.97 0/0 0/0 0/0/0 76.6 3892
+1 1 awg bbr 1 down 97.3 416 5583.6 121.078 121.00 - - 1.02/0.99 0/0 0/0 0/0/0 72.0 3892
+1 1 awg cubic 8 down 7.1 44 14.4 122.165 121.00 - - 1.25/1.40 0/0 0/0 0/0/0 64.5 3585
+1 1 awg cubic 1 down 2.1 4 24.0 120.672 121.00 - - 0.74/1.07 0/0 0/0 0/0/0 59.2 3014
+1 1 awg udp 1 down 736.4 - - - 244.00 749.99 1.47 1.01/1.32 0/19477 0/0 0/0/0 75.4 3890
+1 1 wg bbr 8 down 592.5 2452 2962.7 121.809 145.00 - - 1.00/0.98 0/0 0/0 0/0/0 73.9 3892
+1 1 wg bbr 1 down 100.7 467 6667.7 121.231 121.00 - - 1.07/0.91 0/0 0/0 0/0/0 70.1 3869
+VERIFIED 7 valid of 7 trials
+[run.z8l5IgaK +120 ms RTT]
+round loss mode cc n direction goodput_Mbps retrans cwnd_KiB tcpRTT_ms ICMPp95_ms udp_sent_Mbps udp_loss_pct netem_pct(client/hub) UDP_rcv_errors(hub/cli) tun_err_drop(hub/cli) fragments CPU_temp_C CPU_MHz
+1 1 wg cubic 8 down 11.8 45 19.2 121.964 121.00 - - 0.97/0.92 0/0 0/0 0/0/0 53.8 3240
+1 1 wg cubic 1 down 1.0 6 16.8 121.033 121.00 - - 1.22/0.80 0/0 0/0 0/0/0 52.6 3210
+1 1 wg udp 1 down 737.9 - - - 215.00 749.99 1.25 1.02/0.00 0/18106 0/0 0/0/0 71.5 3891
+VERIFIED 3 valid of 3 trials
+Median by group: delay_ms loss mode cc n dir N Mb/s cwnd_KiB TCP_RTT_ms ICMPp95_ms UDP_loss%, netem% range, total UDP errors/TUN errors/frags
+0 0 socks5-awg-udp bbr 1 down 2 812.11 367.56 3.14 4.59 - 0.00-0.00 0 0 0
+0 0 socks5-awg-udp bbr 8 down 1 813.81 129.52 9.33 14.20 - 0.00-0.00 0 0 0
+0 0 socks5-awg-udp cubic 1 down 2 812.39 816.07 7.36 11.23 - 0.00-0.00 0 0 0
+0 0 socks5-awg-udp cubic 8 down 2 827.59 411.93 28.21 88.35 - 0.00-0.00 0 0 0
+0 0 socks5-awg-udp udp 1 down 2 746.97 - - 1.85 0.40 0.00-0.00 3237 0 0
+0 0 socks5-wg-udp bbr 1 down 2 846.21 405.34 3.30 4.44 - 0.00-0.00 0 0 0
+0 0 socks5-wg-udp bbr 8 down 2 860.30 125.92 8.60 14.10 - 0.00-0.00 0 0 0
+0 0 socks5-wg-udp cubic 1 down 2 846.86 518.06 4.97 5.91 - 0.00-0.00 0 0 0
+0 0 socks5-wg-udp cubic 8 down 2 860.38 936.29 65.61 112.00 - 0.00-0.00 0 0 0
+0 0 socks5-wg-udp udp 1 down 2 749.02 - - 0.89 0.13 0.00-0.00 977 0 0
+0 1 socks5-awg-udp bbr 1 down 2 1004.29 463.50 3.58 5.13 - 1.00-1.03 0 0 0
+0 1 socks5-awg-udp bbr 8 down 2 980.74 162.79 9.19 12.80 - 0.94-1.02 0 0 0
+0 1 socks5-awg-udp cubic 1 down 2 106.82 2.70 0.35 0.78 - 0.91-1.01 0 0 0
+0 1 socks5-awg-udp cubic 8 down 2 534.05 4.20 0.66 0.92 - 0.97-1.05 0 0 0
+0 1 socks5-awg-udp udp 1 down 2 740.05 - - 1.62 1.33 0.00-1.01 3885 0 0
+0 1 socks5-wg-udp bbr 1 down 2 1002.05 482.09 3.66 4.67 - 0.93-1.03 0 0 0
+0 1 socks5-wg-udp bbr 8 down 2 988.16 131.01 8.60 11.50 - 0.98-1.03 0 0 0
+0 1 socks5-wg-udp cubic 1 down 2 100.27 2.40 0.30 0.75 - 0.89-0.98 0 0 0
+0 1 socks5-wg-udp cubic 8 down 2 551.30 4.50 0.68 0.80 - 1.00-1.03 0 0 0
+0 1 socks5-wg-udp udp 1 down 2 736.60 - - 2.98 1.80 0.00-0.99 6317 0 0
+60 1 socks5-awg-udp bbr 1 down 1 97.26 5583.56 121.08 121.00 - 0.99-1.02 0 0 0
+60 1 socks5-awg-udp bbr 8 down 1 716.97 4693.74 123.35 158.00 - 0.97-1.02 0 0 0
+60 1 socks5-awg-udp cubic 1 down 1 2.10 23.98 120.67 121.00 - 0.74-1.07 0 0 0
+60 1 socks5-awg-udp cubic 8 down 1 7.08 14.39 122.16 121.00 - 1.25-1.40 0 0 0
+60 1 socks5-awg-udp udp 1 down 1 736.41 - - 244.00 1.47 1.01-1.32 19477 0 0
+60 1 socks5-wg-udp bbr 1 down 1 100.66 6667.66 121.23 121.00 - 0.91-1.07 0 0 0
+60 1 socks5-wg-udp bbr 8 down 1 592.45 2962.67 121.81 145.00 - 0.98-1.00 0 0 0
+60 1 socks5-wg-udp cubic 1 down 1 1.05 16.79 121.03 121.00 - 0.80-1.22 0 0 0
+60 1 socks5-wg-udp cubic 8 down 1 11.80 19.19 121.96 121.00 - 0.92-0.97 0 0 0
+60 1 socks5-wg-udp udp 1 down 1 737.87 - - 215.00 1.25 0.00-1.02 18106 0 0

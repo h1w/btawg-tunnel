@@ -1,0 +1,11 @@
+arm	loss_pct	seed	run	added_rtt_ms	mode	sender	plain	parity	recovered_at_peer	local_drops	invalid	extra_payload_pct
+shim	0	101	run.5ZJpssQC	200	socks5-awg-udp	hub	330810	0	0	0	0	0.000
+shim	0	101	run.5ZJpssQC	200	socks5-awg-udp	client	376733	0	0	0	0	0.000
+adaptive	0	101	run.U6ueoSol	200	socks5-awg-udp	hub	365302	0	0	0	0	0.997
+adaptive	0	101	run.U6ueoSol	200	socks5-awg-udp	client	389173	0	0	0	0	0.938
+shim	1	101	run.nrpcBiX1	200	socks5-awg-udp	hub	17888	0	0	0	0	0.000
+shim	1	101	run.nrpcBiX1	200	socks5-awg-udp	client	16374	0	0	0	0	0.000
+adaptive	1	101	run.0m2SjzuS	200	socks5-awg-udp	hub	84350	10308	828	0	0	15.905
+adaptive	1	101	run.0m2SjzuS	200	socks5-awg-udp	client	161346	20088	1644	0	0	13.539
+fec	1	101	run.wwj83W3M	200	socks5-awg-udp	hub	145672	18208	1476	0	0	15.172
+fec	1	101	run.wwj83W3M	200	socks5-awg-udp	client	208352	26040	2097	0	0	13.751

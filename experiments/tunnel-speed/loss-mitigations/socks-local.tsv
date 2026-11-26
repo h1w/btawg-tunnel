@@ -1,0 +1,74 @@
+suite	run	round	loss	added_RTT_ms	mode	variant	streams	direction	status	Mbit_s	ICMP_p95_ms	netem_loss_down_pct	netem_loss_up_pct	underlay_bytes_per_payload_byte	dup_hub	dup_client	retransmits	TCP	UDP_RcvbufErrors
+socks	run.bL8Lnlpw	1	0	0	socks5-wg-udp	nat	1	down	ok	822.100	3.890	0.000	0.000	1.126	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-wg-udp	relay-cubic	1	down	ok	886.855	11.700	0.000	0.000	1.128	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-wg-udp	relay-bbr	1	down	ok	941.931	6.780	0.000	0.000	1.125	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-wg-udp	nat	8	down	ok	979.726	27.100	0.000	0.000	1.120	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-wg-udp	relay-cubic	8	down	ok	989.511	26.400	0.000	0.000	1.120	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-wg-udp	relay-bbr	8	down	ok	978.630	10.900	0.000	0.000	1.119	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-awg-udp	nat	1	down	ok	878.734	4.250	0.000	0.000	1.185	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-awg-udp	relay-cubic	1	down	ok	902.710	5.640	0.000	0.000	1.183	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-awg-udp	relay-bbr	1	down	ok	921.887	3.850	0.000	0.000	1.183	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-awg-udp	nat	8	down	ok	950.579	33.700	0.000	0.000	1.171	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-awg-udp	relay-cubic	8	down	ok	894.770	35.900	0.000	0.000	1.181	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	1	0	0	socks5-awg-udp	relay-bbr	8	down	ok	968.791	17.000	0.000	0.000	1.169	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-wg-udp	nat	1	down	ok	99.280	0.559	0.968	0.993	1.142	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-wg-udp	relay-cubic	1	down	ok	86.752	0.508	1.047	1.003	1.142	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-wg-udp	relay-bbr	1	down	ok	939.295	4.930	0.964	1.138	1.113	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-wg-udp	nat	8	down	ok	440.543	0.898	0.980	0.961	1.136	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-wg-udp	relay-cubic	8	down	ok	451.112	0.944	0.960	1.000	1.135	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-wg-udp	relay-bbr	8	down	ok	962.053	16.900	1.006	0.973	1.115	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-awg-udp	nat	1	down	ok	86.859	0.592	1.056	0.991	1.224	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-awg-udp	relay-cubic	1	down	ok	84.873	0.669	0.999	1.182	1.225	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-awg-udp	relay-bbr	1	down	ok	927.471	3.950	0.995	0.740	1.155	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-awg-udp	nat	8	down	ok	470.440	1.330	0.972	0.995	1.211	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-awg-udp	relay-cubic	8	down	ok	451.949	1.310	0.992	1.002	1.211	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	2	1	0	socks5-awg-udp	relay-bbr	8	down	ok	876.400	13.900	1.024	1.050	1.159	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-wg-udp	nat	1	down	ok	97.591	0.547	0.925	0.994	1.141	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-wg-udp	relay-cubic	1	down	ok	76.497	0.532	0.975	1.114	1.143	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-wg-udp	relay-bbr	1	down	ok	930.663	4.960	1.062	0.781	1.114	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-wg-udp	nat	8	down	ok	493.525	1.210	0.983	1.039	1.135	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-wg-udp	relay-cubic	8	down	ok	449.856	1.510	0.992	0.944	1.135	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-wg-udp	relay-bbr	8	down	ok	967.847	22.700	0.972	0.926	1.116	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-awg-udp	nat	1	down	ok	100.050	0.547	0.958	0.916	1.232	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-awg-udp	relay-cubic	1	down	ok	79.678	0.522	1.068	0.973	1.230	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-awg-udp	relay-bbr	1	down	ok	931.768	3.610	0.985	0.942	1.152	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-awg-udp	nat	8	down	ok	421.388	1.120	0.996	1.029	1.213	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-awg-udp	relay-cubic	8	down	ok	422.329	1.120	1.015	1.030	1.213	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	3	1	0	socks5-awg-udp	relay-bbr	8	down	ok	936.082	17.100	1.027	1.032	1.160	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-wg-udp	nat	1	down	ok	903.406	7.890	0.000	0.000	1.125	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-wg-udp	relay-cubic	1	down	ok	906.807	5.070	0.000	0.000	1.127	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-wg-udp	relay-bbr	1	down	ok	943.780	5.130	0.000	0.000	1.124	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-wg-udp	nat	8	down	ok	980.457	57.100	0.000	0.000	1.121	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-wg-udp	relay-cubic	8	down	ok	976.058	16.700	0.000	0.000	1.120	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-wg-udp	relay-bbr	8	down	ok	969.659	13.000	0.000	0.000	1.120	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-awg-udp	nat	1	down	ok	879.183	5.000	0.000	0.000	1.183	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-awg-udp	relay-cubic	1	down	ok	882.222	10.800	0.000	0.000	1.190	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-awg-udp	relay-bbr	1	down	ok	924.968	5.320	0.000	0.000	1.180	-	-	-	bbr-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-awg-udp	nat	8	down	ok	972.231	11.500	0.000	0.000	1.167	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-awg-udp	relay-cubic	8	down	ok	957.690	15.600	0.000	0.000	1.169	-	-	-	cubic-sampled	-
+socks	run.bL8Lnlpw	4	0	0	socks5-awg-udp	relay-bbr	8	down	ok	936.149	21.100	0.000	0.000	1.171	-	-	-	bbr-sampled	-
+SUMMARY	suite	loss	added_RTT_ms	mode	variant	streams	direction	valid	total	median_Mbit_s	median_ICMP_p95_ms	median_underlay_bytes_per_payload_byte
+SUMMARY	socks	0	0	socks5-awg-udp	nat	1	down	2	2	878.958	4.625	1.184
+SUMMARY	socks	0	0	socks5-awg-udp	nat	8	down	2	2	961.405	22.600	1.169
+SUMMARY	socks	0	0	socks5-awg-udp	relay-bbr	1	down	2	2	923.428	4.585	1.181
+SUMMARY	socks	0	0	socks5-awg-udp	relay-bbr	8	down	2	2	952.470	19.050	1.170
+SUMMARY	socks	0	0	socks5-awg-udp	relay-cubic	1	down	2	2	892.466	8.220	1.186
+SUMMARY	socks	0	0	socks5-awg-udp	relay-cubic	8	down	2	2	926.230	25.750	1.175
+SUMMARY	socks	0	0	socks5-wg-udp	nat	1	down	2	2	862.753	5.890	1.125
+SUMMARY	socks	0	0	socks5-wg-udp	nat	8	down	2	2	980.091	42.100	1.120
+SUMMARY	socks	0	0	socks5-wg-udp	relay-bbr	1	down	2	2	942.856	5.955	1.125
+SUMMARY	socks	0	0	socks5-wg-udp	relay-bbr	8	down	2	2	974.144	11.950	1.119
+SUMMARY	socks	0	0	socks5-wg-udp	relay-cubic	1	down	2	2	896.831	8.385	1.128
+SUMMARY	socks	0	0	socks5-wg-udp	relay-cubic	8	down	2	2	982.784	21.550	1.120
+SUMMARY	socks	1	0	socks5-awg-udp	nat	1	down	2	2	93.454	0.570	1.228
+SUMMARY	socks	1	0	socks5-awg-udp	nat	8	down	2	2	445.914	1.225	1.212
+SUMMARY	socks	1	0	socks5-awg-udp	relay-bbr	1	down	2	2	929.620	3.780	1.153
+SUMMARY	socks	1	0	socks5-awg-udp	relay-bbr	8	down	2	2	906.241	15.500	1.159
+SUMMARY	socks	1	0	socks5-awg-udp	relay-cubic	1	down	2	2	82.275	0.596	1.227
+SUMMARY	socks	1	0	socks5-awg-udp	relay-cubic	8	down	2	2	437.139	1.215	1.212
+SUMMARY	socks	1	0	socks5-wg-udp	nat	1	down	2	2	98.435	0.553	1.141
+SUMMARY	socks	1	0	socks5-wg-udp	nat	8	down	2	2	467.034	1.054	1.136
+SUMMARY	socks	1	0	socks5-wg-udp	relay-bbr	1	down	2	2	934.979	4.945	1.114
+SUMMARY	socks	1	0	socks5-wg-udp	relay-bbr	8	down	2	2	964.950	19.800	1.116
+SUMMARY	socks	1	0	socks5-wg-udp	relay-cubic	1	down	2	2	81.624	0.520	1.143
+SUMMARY	socks	1	0	socks5-wg-udp	relay-cubic	8	down	2	2	450.484	1.227	1.135

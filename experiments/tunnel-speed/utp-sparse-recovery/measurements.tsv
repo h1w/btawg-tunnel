@@ -1,0 +1,17 @@
+series	arm	seed	run	managed	loss_pct	added_rtt_ms	mode	streams	direction	status	Mbps	ping_p95_ms	hub_engine_drops	client_tun_drops	netem_random	netem_other	hub_udp_rcv_errors	client_udp_rcv_errors	endpoint_qdisc_drops	endpoint_link_drops	error
+early	stock	101	run.C83wXTpI	1	1	200	socks5-awg-ext-utp	8	down	ok	0.525	4469.00	0	0	16	0	0	0	0	0	
+early	stock	101	run.C83wXTpI	1	1	200	socks5-awg-ext-utp	8	up	ok	0.662	5520.00	0	0	24	0	0	0	0	0	
+early	stock	101	run.C83wXTpI	1	1	200	socks5-awg-req-utp	8	down	ok	0.426	4003.00	0	0	22	0	0	0	0	0	
+early	stock	101	run.C83wXTpI	1	1	200	socks5-awg-req-utp	8	up	ok	0.542	5763.00	0	0	34	0	0	0	0	0	
+early	early	101	run.McLDSGzH	1	1	200	socks5-awg-ext-utp	8	down	ok	0.607	3851.00	0	0	16	0	0	0	0	0	
+early	early	101	run.McLDSGzH	1	1	200	socks5-awg-ext-utp	8	up	ok	0.753	4726.00	0	0	23	0	0	0	0	0	
+early	early	101	run.McLDSGzH	1	1	200	socks5-awg-req-utp	8	down	ok	0.491	3556.00	0	0	21	0	0	0	0	0	
+early	early	101	run.McLDSGzH	1	1	200	socks5-awg-req-utp	8	up	ok	0.497	6507.00	0	0	36	0	0	0	0	0	
+early	stock	101	run.z7yzFZ57	1	0	200	socks5-awg-ext-utp	8	down	ok	208.595	501.00	6650	0	0	0	0	0	0	0	
+early	stock	101	run.z7yzFZ57	1	0	200	socks5-awg-ext-utp	8	up	ok	203.459	207.00	0	2168	0	0	0	0	0	0	
+early	stock	101	run.z7yzFZ57	1	0	200	socks5-awg-req-utp	8	down	ok	163.436	375.00	2657	0	0	0	0	0	0	0	
+early	stock	101	run.z7yzFZ57	1	0	200	socks5-awg-req-utp	8	up	ok	144.873	313.00	0	9286	0	0	0	0	0	0	
+early	early	101	run.xTZFGUxK	1	0	200	socks5-awg-ext-utp	8	down	ok	188.125	505.00	6671	0	0	0	0	0	0	0	
+early	early	101	run.xTZFGUxK	1	0	200	socks5-awg-ext-utp	8	up	ok	179.900	203.00	0	1171	0	0	0	0	0	0	
+early	early	101	run.xTZFGUxK	1	0	200	socks5-awg-req-utp	8	down	ok	169.977	423.00	4772	0	0	0	0	0	0	0	
+early	early	101	run.xTZFGUxK	1	0	200	socks5-awg-req-utp	8	up	ok	208.922	242.00	0	2346	0	0	0	0	0	0	

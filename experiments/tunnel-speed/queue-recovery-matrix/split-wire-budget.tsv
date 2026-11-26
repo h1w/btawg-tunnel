@@ -1,0 +1,5 @@
+profile	run	arm	rate_Mbps	queue	cap_Mbps	goodput_Mbps	ping_p95_ms	random_drops	excess_drops	hub_engine_drops	competitor_sent_Mbps	competitor_received_Mbps	hub_waits	hub_recovered_at_peer	hub_send_drops	client_send_drops
+fec-split-cross	run.cHlHQ6pB	budget	120	2048	60	47.935	500.0	1151	0	0	45.003	44.521	52861	497	23	0
+fec-split-cross	run.V6oihG7b	split	120	2048	60	47.926	500.0	1129	0	0	45.003	44.539	12440	499	0	0
+fec-split-narrow	run.0Ikxi4ZJ	split	10	160	6	4.783	1501.0	106	0	0	-	-	54668	56	0	0
+fec-split-narrow	run.y0drlTT8	budget	10	160	6	4.803	1239.0	103	0	0	-	-	58765	56	37	0

@@ -1,0 +1,15 @@
+variant	run	one_way_ms	mode	streams	direction	status	Mbps	p95_ms	TCP_retx	engine_drops	hub_TUN_packets	drops_per_hub_TUN_pct	qdisc_drops	UDP_rcvbuf_errors
+A	run.lEfv1fvK	0	socks5-awg-ext-utp	8	down	ok	377.79	33.50	58	269	349496	0.077	0	0
+A	run.lEfv1fvK	100	socks5-awg-ext-utp	8	down	ok	209.87	259.00	4849	6145	179197	3.429	0	0
+P	run.l5239ewP	0	socks5-awg-ext-utp	8	down	ok	333.90	38.50	37	180	309547	0.058	0	0
+P	run.l5239ewP	100	socks5-awg-ext-utp	8	down	ok	181.56	267.00	5016	5591	155894	3.586	0	0
+P	run.LdciPryu	0	socks5-awg-ext-utp	8	down	ok	313.68	41.70	311	412	291573	0.141	0	0
+P	run.LdciPryu	100	socks5-awg-ext-utp	8	down	ok	192.59	271.00	4497	5134	165171	3.108	0	0
+A	run.9GyRs4oB	0	socks5-awg-ext-utp	8	down	ok	353.52	37.50	56	354	327539	0.108	0	0
+A	run.9GyRs4oB	100	socks5-awg-ext-utp	8	down	ok	205.22	258.00	6978	7981	178099	4.481	0	0
+P	run.TNk1jHGb	0	socks5-awg-ext-utp	8	down	ok	318.77	40.80	129	478	328433	0.146	0	0
+P	run.TNk1jHGb	100	socks5-awg-ext-utp	8	down	ok	191.91	264.00	5049	6857	181490	3.778	0	0
+D	run.aLvce1cF	0	socks5-awg-ext-utp	8	down	ok	326.24	41.80	69	196	336460	0.058	0	0
+D	run.aLvce1cF	100	socks5-awg-ext-utp	8	down	ok	193.20	266.00	5562	6387	183248	3.485	0	0
+B	run.qnOTxinS	0	socks5-awg-ext-utp	8	down	ok	347.09	71.90	546	925	355867	0.260	0	0
+B	run.qnOTxinS	100	socks5-awg-ext-utp	8	down	ok	236.98	317.00	1549	1958	226228	0.865	0	0

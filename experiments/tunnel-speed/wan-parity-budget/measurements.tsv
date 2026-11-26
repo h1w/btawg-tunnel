@@ -1,0 +1,11 @@
+profile	mode	variant	loss	seconds	Mbit_s	p95_ms	cross_p95_ms	cross_Mbit_s	sendbuf_MiB	max_notsent_KiB	late_sndbuf_pct	late_rwnd_pct	peak_pacing_Mbit_s	WAN_injected_drops	WAN_other_drops	TUN_qdisc_drops	engine_drops	UDP_receive_errors	TCP_retrans_last_sample	reconstructed_down	reconstructed_up	shim_local_send_drops	down_extra_UDP_payload_pct	up_extra_UDP_payload_pct	down_measured_loss_pct	up_measured_loss_pct	max_unacked_payload_MiB	max_advertised_window_MiB	steady_Mbit_s	cross_ack_Mbit_s	hard_limit_drops
+control	socks5-wg-udp	fecstripe	1	16.191	132.637	217.000	-	-	8.000	7948.422	13.200	0	289.431	2832	0	0	0	0	24	2087	0	0	13.365	0.000	0.978	0.977	7.603	17.000	174.534	-	0
+control	socks5-wg-udp	fecstripe	0	14.187	151.370	217.000	-	-	8.000	7948.422	6.600	0.100	291.781	0	0	0	0	0	0	0	0	0	13.362	0.000	0.000	0.000	5.658	16.998	205.465	-	0
+budget	socks5-wg-udp	fecstripe	1	20.669	103.899	213.000	-	-	8.000	7948.422	9.300	0.200	281.190	2830	0	0	0	0	25	2087	0	0	13.365	0.000	0.978	0.971	7.731	17.000	137.814	-	0
+budget	socks5-wg-udp	fecstripe	0	14.612	146.965	215.000	-	-	8.000	7948.422	8.500	0	279.772	0	0	0	0	0	0	0	0	0	13.362	0.000	0.000	0.000	5.600	17.000	198.305	-	0
+cross-budget	socks5-wg-udp	fecstripe	1	20.432	105.102	214.000	235.000	128.665	8.000	7948.422	8.800	0	279.026	3842	0	0	0	0	33	2178	0	0	13.364	0.000	1.016	1.021	7.590	17.000	132.775	109.930	0
+cross-control	socks5-wg-udp	fecstripe	1	19.163	112.062	226.000	239.000	128.692	8.000	7948.422	8.200	0	301.703	3789	0	0	0	0	44	2163	0	0	13.364	0.000	1.016	1.038	7.500	17.000	137.638	96.729	0
+outer-fifo	socks5-wg-udp	integrated	1	31.443	68.298	201.000	201.000	128.602	8.000	7948.422	11.400	0.200	204.801	3267	0	0	0	0	2165	-	-	-	-	-	1.006	1.036	7.774	15.637	78.856	29.284	0
+outer-fifo	socks5-wg-udp	fecstripe	1	21.515	99.813	264.000	285.000	126.367	8.000	7948.422	4.800	0	281.411	3771	1888	0	0	0	430	2173	0	0	13.367	0.000	1.016	1.038	7.526	18.000	117.849	72.451	1888
+outer-aqm	socks5-wg-udp	fecstripe	1	24.247	88.565	269.000	324.000	119.546	8.000	7948.422	4.200	0	274.158	3761	6046	0	0	0	327	2187	0	0	13.366	0.000	1.015	1.051	7.529	18.000	99.283	46.081	6016
+outer-aqm	socks5-wg-udp	integrated	1	32.756	65.560	202.000	202.000	128.611	8.000	7948.422	12.000	0.700	223.497	3275	0	0	0	0	2188	-	-	-	-	-	1.006	1.044	7.794	16.819	75.932	23.772	0

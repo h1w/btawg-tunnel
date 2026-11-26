@@ -1,0 +1,15 @@
+arm	run	one_way_ms	streams	status	data_connections	receiver_bytes_at_abort	ping_sent	ping_received	error
+Q1	run.Ahd9YNBo	0	1	error	1	0	227	1	interrupt - the client has terminated by signal Terminated(15)
+Q1	run.Ahd9YNBo	0	8	error	0	-	40	0	unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection timed out
+Q1	run.Ahd9YNBo	100	8	error	8	655360	228	172	interrupt - the client has terminated by signal Terminated(15)
+A1	run.MrcE7P3p	0	1	error	1	0	227	1	interrupt - the client has terminated by signal Terminated(15)
+A1	run.MrcE7P3p	0	8	error	0	-	39	0	unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection timed out
+A1	run.MrcE7P3p	100	8	error	8	0	227	27	interrupt - the client has terminated by signal Terminated(15)
+A1	run.L94TzXRc	0	1	error	1	0	227	1	interrupt - the client has terminated by signal Terminated(15)
+A1	run.L94TzXRc	0	8	error	0	-	40	0	unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection timed out
+A1	run.L94TzXRc	100	8	error	8	0	227	144	interrupt - the client has terminated by signal Terminated(15)
+Q1	run.AHMUvjAc	0	1	error	1	0	227	3	interrupt - the client has terminated by signal Terminated(15)
+Q1	run.AHMUvjAc	0	8	error	0	-	40	0	unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Connection timed out
+Q1	run.AHMUvjAc	100	8	error	8	0	228	155	interrupt - the client has terminated by signal Terminated(15)
+Q1	run.dLLsn1Yg	0	8	error	8	0	227	1	interrupt - the client has terminated by signal Terminated(15)
+Q1	run.X1FmEacQ	0	8	error	8	-	220	220	unable to receive results: 

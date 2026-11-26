@@ -1,0 +1,15 @@
+run.LHQCiNn7 hub full ticks 48 / 48 cwnd 7636 41966 min peerwnd 25132365 data-phase RTO 0
+hub packets=4860 drops=0 down DATA 3251 last s 28.56 max data gap ms 453.2 last up ACK 6432
+client packets=4819 drops=0 down DATA 3203 last s 28.459 max data gap ms 453.2 last up ACK 6432
+run.qhQ1I3GH hub full ticks 47 / 48 cwnd 1382 39490 min peerwnd 25086227 data-phase RTO 1
+hub packets=4567 drops=0 down DATA 2946 last s 28.077 max data gap ms 204.3 last up ACK 31811
+client packets=4515 drops=0 down DATA 2891 last s 27.975 max data gap ms 204.3 last up ACK 31811
+run.6vz677J2 hub full ticks 48 / 48 cwnd 1382 42380 min peerwnd 25135299 data-phase RTO 2
+hub packets=4346 drops=0 down DATA 2827 last s 28.499 max data gap ms 1416.7 last up ACK 43416
+client packets=4324 drops=0 down DATA 2787 last s 28.398 max data gap ms 1416.7 last up ACK 43416
+run.pplNl8Ad hub full ticks 48 / 48 cwnd 6559 37836 min peerwnd 25144638 data-phase RTO 0
+hub packets=4713 drops=0 down DATA 3098 last s 28.474 max data gap ms 205.2 last up ACK 50227
+client packets=4688 drops=0 down DATA 3064 last s 28.574 max data gap ms 205.2 last up ACK 50252
+run.5uwDg467 hub full ticks 48 / 48 cwnd 6827 42789 min peerwnd 25146408 data-phase RTO 0
+hub packets=4277 drops=0 down DATA 2818 last s 28.264 max data gap ms 203.8 last up ACK 39826
+client packets=4232 drops=0 down DATA 2763 last s 28.364 max data gap ms 203.8 last up ACK 39826

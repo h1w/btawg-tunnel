@@ -1,0 +1,2 @@
+arm	loss	seed	tunnel_flows	run	status	tunnel_Mbps	direct_Mbps	direct_early_Mbps	direct_late_Mbps	rtt_p95_ms	rtt_replies	fifo_drops	random_drops	excess_netem	engine_drops	udp_rcv_errors	overlay_p95_ms	hub_recovered	client_recovered	hub_parity	client_parity	shim_payload_overhead_pct	queue_reports	delay_suspends	invalid	local_drop	hub_wire_tx	hub_wire_payload_bytes	cap_packets	cap_bytes	cap_drops
+repair	1	101	8	run.Kv78s67n	ok	1.593	0.821	0.768	0.873	200.0	60	21	92	0	0	0	220.0	12	0	0	160	3.33	35	0	0	0	2960	3872653	2712	3652723	238

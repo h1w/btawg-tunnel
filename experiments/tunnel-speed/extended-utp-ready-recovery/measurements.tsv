@@ -1,0 +1,17 @@
+series	arm	seed	run	managed	loss_pct	added_rtt_ms	mode	streams	direction	status	Mbps	ping_p95_ms	hub_engine_drops	client_tun_drops	netem_random	netem_other	hub_udp_rcv_errors	client_udp_rcv_errors	endpoint_qdisc_drops	endpoint_link_drops	error
+ready-recovery	A	101	run.hntaNOLQ	1	0	0	socks5-awg-ext-utp	8	down	ok	330.480	38.40	111	0	0	0	0	0	0	0	
+ready-recovery	A	101	run.hntaNOLQ	1	0	200	socks5-awg-ext-utp	8	down	ok	205.790	445.00	6848	58	0	0	0	0	0	0	
+ready-recovery	Q	101	run.plh42QEQ	1	0	0	socks5-awg-ext-utp	8	down	ok	417.041	30.40	148	0	0	0	0	0	0	0	
+ready-recovery	Q	101	run.plh42QEQ	1	0	200	socks5-awg-ext-utp	8	down	ok	239.705	437.00	10948	0	0	0	0	0	0	0	
+ready-recovery	Q	211	run.UZMk2CMb	1	0	0	socks5-awg-ext-utp	8	down	ok	417.452	31.00	105	0	0	0	0	0	0	0	
+ready-recovery	Q	211	run.UZMk2CMb	1	0	200	socks5-awg-ext-utp	8	down	ok	273.133	449.00	11682	0	0	0	0	0	0	0	
+ready-recovery	A	211	run.Z15Ws4yy	1	0	0	socks5-awg-ext-utp	8	down	ok	330.963	38.30	112	0	0	0	0	0	0	0	
+ready-recovery	A	211	run.Z15Ws4yy	1	0	200	socks5-awg-ext-utp	8	down	ok	213.358	438.00	6540	0	0	0	0	0	0	0	
+ready-recovery	A	101	run.MQCioceg	1	1	0	socks5-awg-ext-utp	8	down	ok	22.318	1314.00	715	0	513	0	0	0	0	0	
+ready-recovery	A	101	run.MQCioceg	1	1	200	socks5-awg-ext-utp	8	down	ok	0.507	4791.00	0	0	15	0	0	0	0	0	
+ready-recovery	Q	101	run.orkA2LQi	1	1	0	socks5-awg-ext-utp	8	down	ok	31.529	1290.00	952	0	493	0	0	0	0	0	
+ready-recovery	Q	101	run.orkA2LQi	1	1	200	socks5-awg-ext-utp	8	down	ok	0.668	4267.00	0	0	16	0	0	0	0	0	
+ready-recovery	Q	211	run.WZHjrTAo	1	1	0	socks5-awg-ext-utp	8	down	ok	77.716	1421.00	846	0	927	0	0	0	0	0	
+ready-recovery	Q	211	run.WZHjrTAo	1	1	200	socks5-awg-ext-utp	8	down	ok	0.731	2977.00	0	0	14	0	0	0	0	0	
+ready-recovery	A	211	run.SMMYM3HB	1	1	0	socks5-awg-ext-utp	8	down	ok	34.673	1331.00	657	0	716	0	0	0	0	0	
+ready-recovery	A	211	run.SMMYM3HB	1	1	200	socks5-awg-ext-utp	8	down	ok	0.678	2928.00	0	0	15	0	0	0	0	0	

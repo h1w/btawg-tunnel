@@ -17,3 +17,5 @@ btawg/bin/
 /experiments/tunnel-speed/*/.capture.*/
 /experiments/tunnel-speed/*/.replay.*/
 /experiments/tunnel-speed/*/.check.*/
+/experiments/tunnel-speed/*/*.tar.gz
+!/experiments/tunnel-speed/awg-auto-five/raw.tar.gz

@@ -1,0 +1,14 @@
+suite	run	round	loss	added_RTT_ms	mode	variant	streams	direction	status	Mbit_s	ICMP_p95_ms	netem_loss_down_pct	netem_loss_up_pct	underlay_bytes_per_payload_byte	dup_hub	dup_client	retransmits	TCP	UDP_RcvbufErrors
+socks	run.R2Lr0WnR	1	0	0	socks5-wg-udp	nat	1	down	ok	871.475	3.220	0.000	0.000	1.129	-	-	-	cubic-sampled	-
+socks	run.R2Lr0WnR	1	0	0	socks5-wg-udp	relay-cubic	1	down	ok	898.796	4.220	0.000	0.000	1.127	-	-	-	cubic-sampled	-
+socks	run.R2Lr0WnR	1	0	0	socks5-wg-udp	relay-bbr	1	down	ok	928.032	6.410	0.000	0.000	1.125	-	-	-	bbr-sampled	-
+socks	run.R2Lr0WnR	2	1	0	socks5-wg-udp	nat	1	down	ok	112.049	0.537	0.968	0.997	1.141	-	-	-	cubic-sampled	-
+socks	run.R2Lr0WnR	2	1	0	socks5-wg-udp	relay-cubic	1	down	ok	97.684	0.517	1.044	0.981	1.140	-	-	-	cubic-sampled	-
+socks	run.R2Lr0WnR	2	1	0	socks5-wg-udp	relay-bbr	1	down	ok	272.086	4.540	0.966	1.239	1.110	-	-	-	bbr-sampled	-
+SUMMARY	suite	loss	added_RTT_ms	mode	variant	streams	direction	valid	total	median_Mbit_s	median_ICMP_p95_ms	median_underlay_bytes_per_payload_byte
+SUMMARY	socks	0	0	socks5-wg-udp	nat	1	down	1	1	871.475	3.220	1.129
+SUMMARY	socks	0	0	socks5-wg-udp	relay-bbr	1	down	1	1	928.032	6.410	1.125
+SUMMARY	socks	0	0	socks5-wg-udp	relay-cubic	1	down	1	1	898.796	4.220	1.127
+SUMMARY	socks	1	0	socks5-wg-udp	nat	1	down	1	1	112.049	0.537	1.141
+SUMMARY	socks	1	0	socks5-wg-udp	relay-bbr	1	down	1	1	272.086	4.540	1.110
+SUMMARY	socks	1	0	socks5-wg-udp	relay-cubic	1	down	1	1	97.684	0.517	1.140

@@ -1,0 +1,17 @@
+series	arm	seed	run	managed	loss_pct	added_rtt_ms	mode	streams	direction	status	Mbps	ping_p95_ms	hub_engine_drops	client_tun_drops	netem_random	netem_other	hub_udp_rcv_errors	client_udp_rcv_errors	endpoint_qdisc_drops	endpoint_link_drops	error
+mtu	stock	101	run.NXj3SJ8T	1	1	0	socks5-awg-ext-utp	8	down	ok	34.259	1342.00	861	0	476	0	0	0	0	0	
+mtu	stock	101	run.NXj3SJ8T	1	1	0	socks5-awg-ext-utp	8	up	ok	55.778	1307.00	0	1043	749	0	0	0	0	0	
+mtu	stock	101	run.NXj3SJ8T	1	1	0	socks5-awg-req-utp	8	down	ok	30.466	1283.00	800	0	839	0	0	0	0	0	
+mtu	stock	101	run.NXj3SJ8T	1	1	0	socks5-awg-req-utp	8	up	ok	6.761	2653.00	0	486	198	0	0	0	0	0	
+mtu	stock	101	run.NXj3SJ8T	1	1	200	socks5-awg-ext-utp	8	down	ok	0.586	4992.00	0	0	17	0	0	0	0	0	
+mtu	stock	101	run.NXj3SJ8T	1	1	200	socks5-awg-ext-utp	8	up	ok	0.688	5463.00	0	0	27	0	0	0	0	0	
+mtu	stock	101	run.NXj3SJ8T	1	1	200	socks5-awg-req-utp	8	down	ok	0.281	3916.00	0	0	27	0	0	0	0	0	
+mtu	stock	101	run.NXj3SJ8T	1	1	200	socks5-awg-req-utp	8	up	error	-	8560.00	0	14	50	0	0	0	0	0	fixed TCP workload failed; see stderr
+mtu	patched	101	run.O7EQsRAv	1	1	0	socks5-awg-ext-utp	8	down	ok	44.078	2491.00	1370	0	688	0	0	0	0	0	
+mtu	patched	101	run.O7EQsRAv	1	1	0	socks5-awg-ext-utp	8	up	ok	53.673	1281.00	0	1398	602	0	0	0	0	0	
+mtu	patched	101	run.O7EQsRAv	1	1	0	socks5-awg-req-utp	8	down	ok	25.470	1329.00	124	0	530	0	0	0	0	0	
+mtu	patched	101	run.O7EQsRAv	1	1	0	socks5-awg-req-utp	8	up	ok	47.055	1330.00	0	269	1212	0	0	0	0	0	
+mtu	patched	101	run.O7EQsRAv	1	1	200	socks5-awg-ext-utp	8	down	ok	0.556	4480.00	0	0	15	0	0	0	0	0	
+mtu	patched	101	run.O7EQsRAv	1	1	200	socks5-awg-ext-utp	8	up	ok	0.633	5467.00	0	0	21	0	0	0	0	0	
+mtu	patched	101	run.O7EQsRAv	1	1	200	socks5-awg-req-utp	8	down	ok	0.440	4219.00	0	0	24	0	0	0	0	0	
+mtu	patched	101	run.O7EQsRAv	1	1	200	socks5-awg-req-utp	8	up	ok	0.646	6303.00	0	0	35	0	0	0	0	0	

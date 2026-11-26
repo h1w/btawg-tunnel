@@ -1,0 +1,9 @@
+link_Mbps	loss	seed	flows	awg_uncapped	awg_cap	awg_priority	awg_ratio_vs_cap	tcp_solo	tcp_uncapped	tcp_cap	tcp_priority	tcp_priority_pct_solo	underlay_p95_delta_vs_cap_ms	overlay_p95_delta_vs_cap_ms	hub_repair	client_recovered	tcp_gate	awg_gate
+0	1	101	8	6.328	2.409	2.638	1.095	-	-	-	-	-	0.0	0.0	17	5	n/a	fail
+0	1	211	8	5.488	2.56	2.567	1.003	-	-	-	-	-	0.0	0.0	23	9	n/a	fail
+10	0	101	1	4.279	1.421	1.43	1.006	8.953	4.516	7.685	7.715	86.2	-1.0	-1.0	3	1	pass	pass
+10	0	101	8	7.772	1.671	1.65	0.987	8.953	1.069	7.361	7.633	85.3	1.0	-3.0	0	0	pass	pass
+10	1	101	1	0.462	0.534	0.573	1.073	0.795	0.8	0.624	0.718	90.3	0.0	1.0	6	2	fail	fail
+10	1	101	8	5.318	1.578	1.574	0.997	0.795	0.647	0.787	0.654	82.3	0.0	0.0	0	0	fail	fail
+10	1	211	1	0.526	0.422	0.539	1.277	0.789	0.652	0.821	0.656	83.1	0.0	0.0	3	0	fail	pass
+10	1	211	8	4.738	1.581	1.607	1.016	0.789	0.571	0.779	0.673	85.3	0.0	-1.0	0	0	fail	fail

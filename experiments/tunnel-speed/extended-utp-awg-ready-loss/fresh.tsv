@@ -1,0 +1,5 @@
+variant	loss_pct	run	one_way_ms	mode	streams	direction	status	Mbps	p95_ms	TCP_retx	engine_drops	hub_TUN_packets	drops_per_hub_TUN_pct	qdisc_drops_excluding_injected	UDP_rcvbuf_errors	injected_up	injected_down	measured_up_loss_pct	measured_down_loss_pct
+A	1	run.dZ8Tmd7g	0	socks5-awg-ext-utp	8	down	ok	3.84	3663.00	534	822	9488	8.664	0	0	28	189	0.987	1.088
+Q	1	run.dLLsn1Yg	0	socks5-awg-ext-utp	8	down	error	-	-	-	69	3335	-	0	0	7	54	0.667	1.150
+Q	1	run.X1FmEacQ	0	socks5-awg-ext-utp	8	down	error	-	-	-	1127	11277	-	0	0	17	143	0.680	0.968
+A	1	run.6v4LnXVl	0	socks5-awg-ext-utp	8	down	ok	5.42	4446.00	1177	1175	12273	9.574	0	0	29	215	0.855	0.970

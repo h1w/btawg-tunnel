@@ -1,0 +1,13 @@
+loss	mode	variant	status	goodput_Mbit_s	seconds	p95_ms	sndbuf_MiB	hub_queue_drops	uplink_random_pct	uplink_other_drops	UDP_RcvbufErrors
+0	socks5-wg-udp	reno	ok	24.711	2.716	201.000	2.000	0	0.000	0	0
+0	socks5-wg-udp	bbr-fixed	ok	23.557	2.849	201.000	2.000	0	0.000	0	0
+0	socks5-wg-udp	bbr-auto	ok	28.007	2.396	201.000	9.699	0	0.000	0	0
+0	socks5-awg-udp	reno	ok	24.687	2.718	202.000	2.000	0	0.000	0	0
+0	socks5-awg-udp	bbr-fixed	ok	23.528	2.852	201.000	2.000	0	0.000	0	0
+0	socks5-awg-udp	bbr-auto	ok	28.060	2.392	202.000	9.699	0	0.000	0	0
+1	socks5-wg-udp	reno	error	-	100.013	201.000	2.000	0	1.182	0	0
+1	socks5-wg-udp	bbr-fixed	ok	13.616	4.929	201.000	2.000	0	1.135	0	0
+1	socks5-wg-udp	bbr-auto	ok	15.155	4.428	201.000	8.803	0	1.132	0	0
+1	socks5-awg-udp	reno	error	-	100.012	201.000	2.000	0	1.198	0	0
+1	socks5-awg-udp	bbr-fixed	ok	12.482	5.376	201.000	2.000	0	1.134	0	0
+1	socks5-awg-udp	bbr-auto	ok	17.036	3.939	201.000	10.023	0	1.135	0	0

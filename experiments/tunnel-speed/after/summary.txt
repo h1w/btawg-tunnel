@@ -1,0 +1,57 @@
+PROFILE RTT (min/avg/max/mdev)
+0 rtt min/avg/max/mdev = 0.046/0.074/0.163/0.027 ms
+60 rtt min/avg/max/mdev = 120.093/120.113/120.137/0.012 ms, pipe 3
+100 rtt min/avg/max/mdev = 200.077/200.097/200.126/0.014 ms, pipe 4
+VERIFIED 63/72 positive goodput samples, 2 zero-byte stalls, 7 other failures; 6 modes; all 6 netem profiles verified
+OBSERVED LOSS 0ms: to-client 0.998%, to-hub 1.002%
+OBSERVED LOSS 60ms: to-client 1.053%, to-hub 0.974%
+OBSERVED LOSS 100ms: to-client 1.006%, to-hub 1.042%
+LOADED PROBES: 30 nonempty windows of 31
+ERROR {'one_way_ms': '60', 'mode': 'socks5-awg-ext-utp', 'streams': '8', 'direction': 'up', 'status': 'error', 'mbps': '-', 'seconds': '-', 'bytes': '-', 'retransmits': '-'}
+ERROR {'one_way_ms': '60', 'mode': 'socks5-awg-ext-utp', 'streams': '8', 'direction': 'down', 'status': 'error', 'mbps': '-', 'seconds': '-', 'bytes': '-', 'retransmits': '-'}
+ERROR {'one_way_ms': '60', 'mode': 'socks5-awg-req-utp', 'streams': '8', 'direction': 'down', 'status': 'error', 'mbps': '-', 'seconds': '-', 'bytes': '-', 'retransmits': '-'}
+ERROR {'one_way_ms': '60', 'mode': 'socks5-awg-req-tcp', 'streams': '1', 'direction': 'up', 'status': 'error', 'mbps': '-', 'seconds': '-', 'bytes': '-', 'retransmits': '-'}
+ERROR {'one_way_ms': '60', 'mode': 'socks5-awg-req-tcp', 'streams': '8', 'direction': 'up', 'status': 'error', 'mbps': '-', 'seconds': '-', 'bytes': '-', 'retransmits': '-'}
+ERROR {'one_way_ms': '60', 'mode': 'socks5-awg-req-tcp', 'streams': '8', 'direction': 'down', 'status': 'error', 'mbps': '-', 'seconds': '-', 'bytes': '-', 'retransmits': '-'}
+ERROR {'one_way_ms': '100', 'mode': 'socks5-awg-ext-utp', 'streams': '8', 'direction': 'down', 'status': 'stalled', 'mbps': '0', 'seconds': '7.999921', 'bytes': '0', 'retransmits': '0'}
+ERROR {'one_way_ms': '100', 'mode': 'socks5-awg-req-utp', 'streams': '1', 'direction': 'down', 'status': 'error', 'mbps': '-', 'seconds': '-', 'bytes': '-', 'retransmits': '-'}
+ERROR {'one_way_ms': '100', 'mode': 'socks5-awg-req-utp', 'streams': '8', 'direction': 'down', 'status': 'stalled', 'mbps': '0', 'seconds': '7.999951', 'bytes': '0', 'retransmits': '2'}
+REPEAT 60 socks5-awg-ext-utp 8 up ok 0.6756755460267695
+REPEAT 60 socks5-awg-ext-utp 8 down ok 0.6553649971581033
+REPEAT 60 socks5-awg-req-utp 8 down error -
+REPEAT 60 socks5-awg-req-tcp 1 up ok 12.612133932134878
+REPEAT 60 socks5-awg-req-tcp 8 up ok 18.1606599923135
+REPEAT 60 socks5-awg-req-tcp 8 down ok 22.806636331522576
+REPEAT 100 socks5-awg-ext-utp 8 down error -
+REPEAT 100 socks5-awg-req-utp 1 down ok 0.5243195902553129
+REPEAT 100 socks5-awg-req-utp 8 down error -
+
+TCP 1 streams
+| Туннель | +0 мс RTT | +120 мс RTT | +200 мс RTT |
+|---|---:|---:|---:|
+| socks5-awg-ext-tcp | 163.58 / 253.96 | 18.74 / 10.82 | 8.26 / 4.28 |
+| socks5-awg-ext-utp | 18.74 / 4.43 | 0.66 / 1.59 | 0.39 / 0.50 |
+| socks5-awg-req-tcp | 134.48 / 142.09 | 8.39 / 12.61† | 4.85 / 3.41 |
+| socks5-awg-req-utp | 11.67 / 9.70 | 0.66 / 0.53 | 0.52† / 0.61 |
+| socks5-awg-udp | 76.15 / 78.84 | 1.18 / 0.90 | 1.31 / 0.89 |
+| socks5-wg-udp | 88.87 / 97.64 | 1.18 / 1.29 | 0.52 / 1.28 |
+
+TCP 8 streams
+| Туннель | +0 мс RTT | +120 мс RTT | +200 мс RTT |
+|---|---:|---:|---:|
+| socks5-awg-ext-tcp | 187.57 / 214.21 | 28.71 / 18.71 | 15.60 / 18.76 |
+| socks5-awg-ext-utp | 5.77 / 0.84 | 0.66† / 0.68† | 0* / 0.63 |
+| socks5-awg-req-tcp | 126.37 / 185.16 | 22.81† / 18.16† | 12.85 / 10.24 |
+| socks5-awg-req-utp | 0.26 / 1.76 | — / 0.45 | 0* / 0.12 |
+| socks5-awg-udp | 438.69 / 446.20 | 8.39 / 9.94 | 11.27 / 7.54 |
+| socks5-wg-udp | 459.03 / 471.92 | 10.22 / 8.13 | 8.39 / 8.57 |
+
+Loaded RTT median (ms)
+| Туннель | +0 мс RTT | +120 мс RTT | +200 мс RTT |
+|---|---:|---:|---:|
+| socks5-awg-ext-tcp | 25.2 / 302.0 | 341.0 / 420.0 | 552.0 / 390.0 |
+| socks5-awg-ext-utp | 1189.0 / — | 3503.0 / 3204.0 | 4248.0 / 2543.0 |
+| socks5-awg-req-tcp | 110.0 / 352.0 | 356.0 / 357.0 | 609.0 / 584.0 |
+| socks5-awg-req-utp | 5223.0 / 1304.0 | — / 4124.0 | 3581.0 / 3974.5 |
+| socks5-awg-udp | 0.9 / 0.7 | 120.0 / 120.0 | 200.0 / 200.0 |
+| socks5-wg-udp | 0.7 / 0.7 | 120.0 / 120.0 | 200.0 / 200.0 |

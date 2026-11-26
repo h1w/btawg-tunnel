@@ -1,0 +1,10 @@
+run_directory	one_way_ms	mode	streams	direction	status	mbps	seconds	bytes	retransmits
+run.gV596XN4	60	socks5-awg-ext-utp	8	up	ok	0.6756755460267695	13.967035	1179648	0
+run.MW7IwUyO	60	socks5-awg-ext-utp	8	down	ok	0.6553649971581033	7.999939	655360	0
+run.RVhofZug	60	socks5-awg-req-utp	8	down	error	-	-	-	-
+run.c5IgGXSm	60	socks5-awg-req-tcp	1	up	ok	12.612133932134878	8.230885	12976128	0
+run.PmTQNqaC	60	socks5-awg-req-tcp	8	up	ok	18.1606599923135	8.487614	19267584	0
+run.eQIi8Wzb	60	socks5-awg-req-tcp	8	down	ok	22.806636331522576	7.999962	22806528	116
+run.NrzdnJKA	100	socks5-awg-ext-utp	8	down	error	-	-	-	-
+run.nJSUk012	100	socks5-awg-req-utp	1	down	ok	0.5243195902553129	7.999518	524288	1
+run.INM2Mqi3	100	socks5-awg-req-utp	8	down	error	-	-	-	-

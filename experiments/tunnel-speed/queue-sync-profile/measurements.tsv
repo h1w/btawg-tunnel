@@ -1,0 +1,13 @@
+series	arm	seed	run	managed	loss_pct	added_rtt_ms	mode	streams	direction	status	Mbps	ping_p95_ms	hub_engine_drops	client_tun_drops	netem_random	netem_other	hub_udp_rcv_errors	client_udp_rcv_errors	endpoint_qdisc_drops	endpoint_link_drops	error
+profile	profile	101	run.odDpOVDI	1	0	0	socks5-wg-udp	8	down	ok	799.147	5.10	577	0	0	0	0	0	0	0	
+profile	profile	101	run.odDpOVDI	1	0	0	socks5-wg-udp	8	up	ok	797.931	50.00	0	2369	0	0	0	0	0	0	
+profile	profile	101	run.odDpOVDI	1	0	0	socks5-awg-udp	8	down	ok	800.003	5.51	0	0	0	0	0	0	0	0	
+profile	profile	101	run.odDpOVDI	1	0	0	socks5-awg-udp	8	up	ok	797.867	68.30	0	2014	0	0	0	0	0	0	
+mono	stock	101	run.mF1SQDum	1	0	0	socks5-wg-udp	8	down	ok	797.879	2.45	1553	0	0	0	0	0	0	0	
+mono	stock	101	run.mF1SQDum	1	0	0	socks5-awg-udp	8	down	ok	799.999	5.74	0	0	0	0	0	0	0	0	
+mono	mono	101	run.yCsIcTuA	1	0	0	socks5-wg-udp	8	down	ok	798.378	6.22	1833	0	0	0	0	0	0	0	
+mono	mono	101	run.yCsIcTuA	1	0	0	socks5-awg-udp	8	down	ok	799.691	3.90	0	0	0	0	0	0	0	0	
+mono	mono	211	run.FW8OOGBJ	1	0	0	socks5-wg-udp	8	down	ok	799.919	2.38	0	0	0	0	0	0	0	0	
+mono	mono	211	run.FW8OOGBJ	1	0	0	socks5-awg-udp	8	down	ok	763.237	182.00	14245	0	0	0	0	13761	0	0	
+mono	stock	211	run.vk6Jvz2x	1	0	0	socks5-wg-udp	8	down	ok	799.352	3.37	471	0	0	0	0	0	0	0	
+mono	stock	211	run.vk6Jvz2x	1	0	0	socks5-awg-udp	8	down	ok	776.925	149.00	9689	0	0	0	0	6450	0	0	

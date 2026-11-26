@@ -1,0 +1,13 @@
+series	arm	seed	mode	direction	offered_Mbps	receiver_Mbps	app_lost	hub_cpu_ms	hub_dispatch_clock_ms	hub_engine_read_clock_ms	hub_enqueue_cpu_ms	client_enqueue_cpu_ms
+profile	profile	101	socks5-wg-udp	down	800.001	799.147	577	10260	1050	370	140	0
+profile	profile	101	socks5-wg-udp	up	799.962	797.931	1815	9000	0	0	0	50
+profile	profile	101	socks5-awg-udp	down	800.003	800.003	0	10580	1130	190	170	0
+profile	profile	101	socks5-awg-udp	up	799.953	797.867	1605	9120	0	0	0	20
+mono	stock	101	socks5-wg-udp	down	799.998	797.879	1553	10370	960	300	170	0
+mono	stock	101	socks5-awg-udp	down	800.008	799.999	0	10590	1140	280	160	0
+mono	mono	101	socks5-wg-udp	down	799.996	798.378	1150	10420	540	200	180	0
+mono	mono	101	socks5-awg-udp	down	800.000	799.691	0	10570	620	180	190	0
+mono	mono	211	socks5-wg-udp	down	800.000	799.919	0	10460	430	90	200	0
+mono	mono	211	socks5-awg-udp	down	800.000	763.237	11386	10460	550	120	130	0
+mono	stock	211	socks5-wg-udp	down	800.005	799.352	471	10370	980	290	200	0
+mono	stock	211	socks5-awg-udp	down	800.003	776.925	9873	10720	1090	270	100	0

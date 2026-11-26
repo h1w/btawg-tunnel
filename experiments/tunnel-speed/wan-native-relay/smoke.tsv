@@ -1,0 +1,9 @@
+loss	mode	variant	direction	bytes	seconds	goodput_Mbit_s	status	loaded_p95_ms	hub_engine_queue_drops	received_on_timeout
+0	socks5-wg-udp	integrated	down	8388608	2.628	25.534	ok	202.0	0	-
+0	socks5-wg-udp	integrated	up	4194304	2.435	13.780	ok	201.0	0	-
+0	socks5-awg-udp	integrated	down	8388608	2.660	25.231	ok	201.0	0	-
+0	socks5-awg-udp	integrated	up	4194304	2.457	13.654	ok	203.0	0	-
+1	socks5-wg-udp	integrated	down	8388608	3.565	18.826	ok	202.0	0	-
+1	socks5-wg-udp	integrated	up	4194304	3.343	10.039	ok	201.0	0	-
+1	socks5-awg-udp	integrated	down	8388608	3.587	18.710	ok	205.0	0	-
+1	socks5-awg-udp	integrated	up	4194304	3.117	10.764	ok	205.0	0	-

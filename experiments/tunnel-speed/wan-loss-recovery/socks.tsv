@@ -1,0 +1,4 @@
+suite	run	round	loss	added_RTT_ms	mode	variant	streams	direction	status	Mbit_s	ICMP_p95_ms	netem_loss_down_pct	netem_loss_up_pct	underlay_bytes_per_payload_byte	dup_hub	dup_client	retransmits	TCP	UDP_RcvbufErrors
+socks	run.GFOTJHQu	1	1	120	socks5-wg-udp	relay-bbr	1	down	ok	16.347	121.000	1.035	0.796	1.144	-	-	-	bbr-sampled	-
+socks	run.z9yRfkuJ	1	1	120	socks5-wg-udp	relay-bbr	1	down	ok	81.833	121.000	0.995	1.081	1.114	-	-	-	bbr-sampled	-
+socks	run.Ag1iiYpo	1	1	120	socks5-wg-udp	relay-bbr	1	down	ok	205.938	124.000	1.000	1.147	1.120	-	-	-	bbr-sampled	-
