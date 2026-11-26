@@ -36,12 +36,12 @@ if ((Get-Service -Name btawg-client).Status -ne 'Running') { throw 'closing the 
 $clientConfig = Get-Content -Raw (Join-Path $env:ProgramData 'btawg/client.json') | ConvertFrom-Json
 $ports = 1080..1092
 foreach ($port in $ports) {
-    $curlSettings = "socks5-hostname = 127.0.0.1:$port`nproxy-user = $($clientConfig.credentials.username):$($clientConfig.credentials.password)`n"
-    $body = $curlSettings | & curl.exe -q --config - --noproxy '' --silent --show-error --fail --max-time 10 $f.EchoURL
+    $curlSettings = "socks5-hostname = 127.0.0.1:$port`nproxy-user = $($clientConfig.credentials.username):$($clientConfig.credentials.password)`nnoproxy = `"`"`n"
+    $body = $curlSettings | & curl.exe -q --config - --silent --show-error --fail --max-time 10 $f.EchoURL
     if ($LASTEXITCODE -ne 0 -or ($body -join "`n") -ne $f.EchoBody) { throw "SOCKS port $port failed" }
     Write-Output "SOCKS TCP/DNS $port PASS"
 }
-$body = & curl.exe -q --proxy '' --noproxy '*' --silent --show-error --fail --max-time 10 $f.PeerEchoURL
+$body = & curl.exe -q --noproxy '*' --silent --show-error --fail --max-time 10 $f.PeerEchoURL
 if ($LASTEXITCODE -ne 0 -or ($body -join "`n") -ne $f.EchoBody) { throw 'plain VPN TCP to Linux peer failed' }
 Write-Output 'Windows kernel VPN TCP to Linux peer PASS'
 $after = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Sort-Object InterfaceIndex,NextHop | Select-Object InterfaceIndex,NextHop,RouteMetric | ConvertTo-Json -Compress

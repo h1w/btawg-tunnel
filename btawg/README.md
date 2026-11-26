@@ -259,6 +259,9 @@ The fixture JSON supplies `ImportFile`, `VPNIP`, `EchoURL`, `EchoBody`,
 `PeerEchoURL`, and `ObservationFile`. The observation JSON records `sha256`,
 `platform` (`windows-11`), and a `scenarios` map with a `passed` boolean and
 a link or path to evidence for each required case listed by the harness.
+`EchoURL` must name a routed IPv4 echo service reachable through the hub WAN;
+the hub's system resolver (including `/etc/hosts`) must resolve that name.
+Use a separate overlay address for the direct `PeerEchoURL` check.
 Do not include imports or credentials in the evidence.
 Protect the `windows-client-parity` GitHub environment with required reviewers.
 Set its `WINDOWS_11_VERIFIED_SHA256` secret after the passing run for the tagged

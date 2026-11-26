@@ -154,6 +154,7 @@ func answerQuery(ctx context.Context, conn net.Conn, req []byte, allowed func() 
 
 	if err == nil {
 		for _, a := range addrs {
+			a = a.Unmap()
 			if !a.Is4() {
 				continue
 			}

@@ -54,7 +54,11 @@ func TestLookupIPv4Success(t *testing.T) {
 		if host != "example.com." {
 			return nil, &net.DNSError{Err: "absolute name required", Name: host, IsNotFound: true}
 		}
-		return want, nil
+		return []netip.Addr{
+			netip.MustParseAddr("10.0.0.1"),
+			netip.MustParseAddr("2001:db8::1"),
+			netip.MustParseAddr("::ffff:10.0.0.2"),
+		}, nil
 	})
 	addr, stop := runServer(t, nil)
 	defer stop()
