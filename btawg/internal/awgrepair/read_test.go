@@ -147,3 +147,48 @@ func TestFallbackReadDeliversAdjustedWindowToEncryption(t *testing.T) {
 		t.Fatalf("fallback credit was not applied to encryption buffer; n=%d err=%v original=%x output=%x", n, err, original[34:38], buf[66:70])
 	}
 }
+
+// netstack can hold an endpoint lock while handing its final packet to
+// Read. Close needs that lock before it can close the underlying read side.
+type notifyingCloseTUN struct {
+	*testTUN
+	abort chan struct{}
+}
+
+func (b *notifyingCloseTUN) Close() error {
+	defer b.testTUN.Close()
+	for range 2 {
+		select {
+		case b.input <- []byte{0x45}:
+		case <-b.abort:
+			return errors.New("fallback stopped draining before netstack closed")
+		}
+	}
+	return nil
+}
+
+func TestFallbackDrainsNetstackDuringClose(t *testing.T) {
+	for _, started := range []bool{false, true} {
+		b := &notifyingCloseTUN{testTUN: fixtureTUN(), abort: make(chan struct{})}
+		b.input = make(chan []byte)
+		d := newDevice(b, true)
+		if started {
+			go func() { b.input <- []byte{1} }()
+			if got := nextDatagram(t, d); !bytes.Equal(got, []byte{1}) {
+				t.Fatal("missing first packet")
+			}
+		}
+		closed := make(chan error, 1)
+		go func() { closed <- d.Close() }()
+		select {
+		case err := <-closed:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(time.Second):
+			close(b.abort)
+			<-closed
+			t.Fatalf("Close stranded outstanding netstack packets (reader started: %v)", started)
+		}
+	}
+}

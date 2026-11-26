@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	"golang.org/x/sys/windows"
 )
 
 func TestWindowsControlRejectsWrongServer(t *testing.T) {
@@ -46,12 +44,17 @@ func TestWindowsControlRejectsWrongServer(t *testing.T) {
 		c.Close()
 		t.Fatal("accepted a pipe with an unrelated server PID")
 	}
-	if errors.Is(err, ErrNotRunning) || errors.Is(err, windows.ERROR_FILE_NOT_FOUND) {
-		t.Fatalf("mismatched pipe was treated as offline: %v", err)
+	if !errors.Is(err, errWrongPipeServer) {
+		t.Fatalf("expected verified server PID mismatch, got %v", err)
+	}
+	// go-winio retries Accept if the verified client disconnected before
+	// ConnectNamedPipe completed. No request reached that instance either.
+	if err := ln.Close(); err != nil {
+		t.Fatal(err)
 	}
 	select {
 	case err := <-seen:
-		if err != nil {
+		if err != nil && !errors.Is(err, net.ErrClosed) {
 			t.Fatal(err)
 		}
 	case <-ctx.Done():

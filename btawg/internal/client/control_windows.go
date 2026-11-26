@@ -75,6 +75,8 @@ func dialControl(path string) (net.Conn, error) {
 	return conn, err
 }
 
+var errWrongPipeServer = errors.New("control pipe server is not the managed client")
+
 func dialVerifiedPipe(ctx context.Context, path string, expect uint32) (net.Conn, error) {
 	conn, err := winio.DialPipeContext(ctx, path)
 	if err != nil {
@@ -90,7 +92,7 @@ func dialVerifiedPipe(ctx context.Context, path string, expect uint32) (net.Conn
 	}
 	if expect == 0 || pid != expect {
 		_ = conn.Close()
-		return nil, errors.New("control pipe server is not the managed client")
+		return nil, errWrongPipeServer
 	}
 	return conn, nil
 }

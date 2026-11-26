@@ -252,6 +252,11 @@ func (d *Device) Close() error {
 		d.closed = true
 		close(d.done)
 		d.mu.Unlock()
+		if d.direct == nil && d.native == nil {
+			// netstack can synchronously emit packets while closing an endpoint.
+			// Keep a reader even if AWG never requested its first batch.
+			d.startFallback()
+		}
 		d.native.interrupt()
 		d.closeErr = d.Device.Close()
 		d.native.close()
@@ -259,6 +264,13 @@ func (d *Device) Close() error {
 	})
 	return d.closeErr
 }
+func (d *Device) startFallback() {
+	d.start.Do(func() {
+		d.workers.Add(1)
+		go d.readLoop()
+	})
+}
+
 func (d *Device) readLoop() {
 	defer d.workers.Done()
 	n := max(1, d.Device.BatchSize())
@@ -276,13 +288,12 @@ func (d *Device) readLoop() {
 		batch.n, batch.err = d.Device.Read(batch.bufs, batch.sizes, 0)
 		select {
 		case d.data <- &batch:
+			// A successful handoff transfers ownership until Read returns the
+			// buffer, even if Close begins while finishRead is still using it.
+			<-d.ack
 		case <-d.done:
-			return
-		}
-		select {
-		case <-d.ack:
-		case <-d.done:
-			return
+			// No AWG consumer is required during teardown. Drain until the
+			// underlying Close unblocks its final writer and then ends Read.
 		}
 		if batch.err != nil && !errors.Is(batch.err, tun.ErrTooManySegments) {
 			return
@@ -398,14 +409,7 @@ func (d *Device) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 		case d.native != nil:
 			count, readErr = d.native.read(bufs, sizes, offset)
 		default:
-			d.start.Do(func() {
-				d.mu.Lock()
-				defer d.mu.Unlock()
-				if !d.closed {
-					d.workers.Add(1)
-					go d.readLoop()
-				}
-			})
+			d.startFallback()
 			select {
 			case <-d.done:
 				return 0, net.ErrClosed
