@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math/rand/v2"
 	"net"
 	"testing"
 	"time"
@@ -248,19 +249,26 @@ func sendVariedStartup(t *testing.T, c net.Conn, ownOdd bool) {
 }
 
 func TestRequestPieceVariedNonZeroOffset(t *testing.T) {
-	t.Setenv("BTAWG_REQ_EXPERIMENT", "varied")
+	const features = wideRequestFeature | compactRequestFeature | windowRequestFeature | variedRequestFeature
 	a, b := tcpPair(t)
 	if err := b.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatal(err)
 	}
 
-	ready := make(chan result, 1)
+	tr := newRequestPieceCarrier(a, features, features)
+	// The production RNG can legitimately choose zero. Exercise the
+	// nonzero wire tuple with a reproducible random stream.
+	tr.rnd = rand.New(rand.NewPCG(1, 0))
+	ready := make(chan struct{})
 	go func() {
-		tr, pid, err := NewHubRequestPiece(a, testHash, peerA, false)
-		ready <- result{tr: tr, pid: pid, err: err}
+		defer close(ready)
+		tr.start(true)
 	}()
-
-	handshakeReply(t, b, wideRequestFeature|compactRequestFeature|windowRequestFeature|variedRequestFeature)
+	t.Cleanup(func() {
+		_ = a.Close()
+		<-ready
+		tr.Wait()
+	})
 	for _, id := range []byte{5, 2, 1} {
 		if got := readMessage(t, b)[0]; got != id {
 			t.Fatalf("startup message ID %d, want %d", got, id)
@@ -268,8 +276,7 @@ func TestRequestPieceVariedNonZeroOffset(t *testing.T) {
 	}
 	sendVariedStartup(t, b, true)
 
-	// Read one request issued by the client; varied requests must use a
-	// nonzero begin offset and a bounded block length.
+	// Use the request actually sent by the local carrier.
 	req := readMessage(t, b)
 	if len(req) != 13 || req[0] != 6 {
 		t.Fatalf("expected 13-byte request, got %d bytes id=%d", len(req), req[0])
@@ -301,17 +308,13 @@ func TestRequestPieceVariedNonZeroOffset(t *testing.T) {
 		t.Fatalf("write piece: %v", err)
 	}
 
-	r := <-ready
-	if r.err != nil {
-		t.Fatalf("local carrier: %v", r.err)
-	}
-	t.Cleanup(r.tr.Wait)
+	<-ready
 	select {
-	case got := <-r.tr.Recv():
+	case got := <-tr.Recv():
 		if !bytes.Equal(got, payload) {
 			t.Fatalf("received %q, want %q", got, payload)
 		}
-	case <-r.tr.Done():
+	case <-tr.Done():
 		t.Fatal("carrier closed before delivering valid varied piece")
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for varied piece")
