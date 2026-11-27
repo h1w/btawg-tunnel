@@ -93,3 +93,30 @@ func (h *delayHist) value() uint32 {
 	}
 	return value
 }
+
+// A route step raises both one-way delay floors. A filled forward FIFO does
+// not. Keep half the common rise as delay pressure: this is evidence from
+// ACKs, not a way to distinguish an arbitrary pair of full queues from WAN.
+type propagationStep struct {
+	start, last uint64 // milliseconds
+	low, high   uint32 // microseconds, across both directions
+}
+
+func (p *propagationStep) observe(ms uint64, forward, reverse uint32, rttRise, srttRise int64) uint32 {
+	lo, hi := min(forward, reverse), max(forward, reverse)
+	// Compare additional RTT with additional delay, not absolute RTT.
+	if lo < 20_000 || hi-lo > 8_000 || rttRise < int64(lo)*2-8_000 || rttRise > int64(hi)*2+8_000 || srttRise > int64(hi)*2+20_000 {
+		p.start = 0
+		return 0
+	}
+	if p.start == 0 || ms-p.last > 750 || max(p.high, hi)-min(p.low, lo) > 8_000 {
+		*p = propagationStep{start: ms, last: ms, low: lo, high: hi}
+		return 0
+	}
+	p.last, p.low, p.high = ms, min(p.low, lo), max(p.high, hi)
+	if ms-p.start < 2_000 {
+		return 0
+	}
+	p.start = 0
+	return p.low / 2
+}

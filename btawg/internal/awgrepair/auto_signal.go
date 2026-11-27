@@ -17,12 +17,13 @@ const (
 // observed pre-repair packets. All fields are derived from tiny fingerprints;
 // no original packet data is retained.
 type autoEvidence struct {
-	stamp    uint32        // probe timestamp (sender milliseconds, raw)
-	total    int           // IDs carried in this probe
-	missing  int           // IDs not found in the local receive window
-	rate     uint64        // observed receive rate in bytes/sec
-	queue    time.Duration // queue delay relative to the minimum probe delta
-	headroom bool          // spare serialization capacity observed recently
+	stamp        uint32        // probe timestamp (sender milliseconds, raw)
+	total        int           // IDs carried in this probe
+	missing      int           // IDs not found in the local receive window
+	rate         uint64        // observed receive rate in bytes/sec
+	queue        time.Duration // queue delay relative to the minimum probe delta
+	forwardQueue bool          // most of a measured RTT was added in this direction
+	headroom     bool          // spare serialization capacity observed recently
 }
 
 // autoMeter observes one direction of a lossy path. It samples eligible
@@ -52,8 +53,9 @@ type autoMeter struct {
 	train    arrivalTrain
 
 	// Queue baseline: minimum (receiver time - probe stamp) seen so far.
-	minDelta    int64
+	minDelta    uint32
 	minDeltaSet bool
+	sawLANProbe bool // a low-RTT probe established a one-way reference for this session
 }
 
 // autoRate estimates a simple bytes-per-second rate over the latest window.
@@ -200,13 +202,14 @@ func (m *autoMeter) probe(payload []byte, now time.Time) (autoEvidence, bool) {
 	ev.rate = m.rx.current(now)
 	ev.headroom = m.train.available(now)
 
-	delta := int64(int32(clock(now) - ev.stamp))
-	if !m.minDeltaSet || delta < m.minDelta {
+	delta := clock(now) - ev.stamp
+	aboveBase := int32(delta - m.minDelta)
+	if !m.minDeltaSet || aboveBase < 0 {
 		m.minDelta = delta
 		m.minDeltaSet = true
 		ev.queue = 0
 	} else {
-		ev.queue = time.Duration(delta-m.minDelta) * time.Millisecond
+		ev.queue = time.Duration(aboveBase) * time.Millisecond
 	}
 	return ev, true
 }

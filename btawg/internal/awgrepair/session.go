@@ -19,20 +19,21 @@ const (
 // innerSession authenticates inner IPv4 control frames and runs a 3-way
 // handshake to establish a fresh per-session key.
 type innerSession struct {
-	established         bool
-	client              bool
-	gen                 uint64
-	k                   key
-	sendAEAD, recvAEAD  cipher.AEAD
-	plaintext           [innerMaxData]byte // valid through the current receive callback; device state is locked
-	seq                 uint64
-	rx                  replay
-	last                time.Time
-	pending             [32]byte
-	pendingAt           time.Time
-	nextHello           time.Time
-	handshakeRTT        time.Duration // locally timed hello/challenge or challenge/confirm
-	offerCold, peerCold bool
+	established           bool
+	client                bool
+	gen                   uint64
+	k                     key
+	sendAEAD, recvAEAD    cipher.AEAD
+	plaintext             [innerMaxData]byte // valid through the current receive callback; device state is locked
+	seq                   uint64
+	rx                    replay
+	last                  time.Time
+	pending               [32]byte
+	pendingAt             time.Time
+	nextHello             time.Time
+	handshakeRTT          time.Duration // locally timed hello/challenge or challenge/confirm
+	offerCold, peerCold   bool
+	pendingStep, peerStep bool
 }
 
 // begin emits a hello handshake packet if the session is not established or
@@ -52,7 +53,7 @@ func (s *innerSession) begin(k *key, src, dst netip.Addr, now time.Time, out []b
 	s.pendingAt = now
 	s.established = false
 	src4, dst4 := src.As4(), dst.As4()
-	return sealInner(out, k, src4, dst4, hello, s.coldFlag(), 0, s.pending[:16])
+	return sealInner(out, k, src4, dst4, hello, s.coldFlag(), s.stepFlag(), s.pending[:16])
 }
 
 // Older peers use zero in the authenticated handshake sequence field and
@@ -66,6 +67,21 @@ func (s *innerSession) coldFlag() uint64 {
 func (s *innerSession) challengeFlag() uint64 {
 	if s.peerCold {
 		return s.coldFlag()
+	}
+	return 0
+}
+
+// This authenticated field was zero and ignored in legacy hello/challenge.
+func (s *innerSession) stepFlag() uint64 {
+	if s.offerCold {
+		return 1
+	}
+	return 0
+}
+
+func (s *innerSession) challengeStepFlag() uint64 {
+	if s.pendingStep {
+		return 1
 	}
 	return 0
 }
@@ -146,7 +162,7 @@ func (s *innerSession) receive(k *key, local, remote netip.Addr, client bool, pa
 		}
 		// Retransmitted hello before timeout: echo the existing challenge.
 		if bytes.Equal(s.pending[:16], data) && now.Sub(s.pendingAt) <= probeLifetime {
-			return 0, nil, sealInner(out, k, local4, remote4, challenge, s.challengeFlag(), 0, s.pending[:32]), true
+			return 0, nil, sealInner(out, k, local4, remote4, challenge, s.challengeFlag(), s.challengeStepFlag(), s.pending[:32]), true
 		}
 		var hubNonce [16]byte
 		if !readNonce(hubNonce[:]) {
@@ -155,8 +171,9 @@ func (s *innerSession) receive(k *key, local, remote netip.Addr, client bool, pa
 		copy(s.pending[:16], data)
 		copy(s.pending[16:], hubNonce[:])
 		s.peerCold = s.offerCold && seq == coldCapVersion
+		s.pendingStep = s.offerCold && gen == 1
 		s.pendingAt = now
-		return 0, nil, sealInner(out, k, local4, remote4, challenge, s.challengeFlag(), 0, s.pending[:32]), true
+		return 0, nil, sealInner(out, k, local4, remote4, challenge, s.challengeFlag(), s.challengeStepFlag(), s.pending[:32]), true
 
 	case challenge:
 		if !client || len(data) != 32 || !bytes.Equal(data[:16], s.pending[:16]) {
@@ -174,6 +191,7 @@ func (s *innerSession) receive(k *key, local, remote netip.Addr, client bool, pa
 		s.establish(k)
 		s.handshakeRTT = now.Sub(s.pendingAt)
 		s.peerCold = s.offerCold && seq == coldCapVersion
+		s.peerStep = s.offerCold && gen == 1
 		s.last = now
 		return 0, nil, sealInner(out, k, local4, remote4, confirm, 0, s.gen, s.pending[:32]), true
 
@@ -190,6 +208,7 @@ func (s *innerSession) receive(k *key, local, remote netip.Addr, client bool, pa
 		}
 		s.establish(k)
 		s.handshakeRTT = now.Sub(s.pendingAt)
+		s.peerStep = s.pendingStep
 		s.last = now
 		return 0, nil, nil, true
 

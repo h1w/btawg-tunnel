@@ -30,7 +30,7 @@ jobs:
         run: go test ./... -count=1 -timeout 300s
       - name: pure-Go uTP transport regressions
         working-directory: btawg/third_party/go-utp
-        run: go test ./purego -run 'Test(CongestionAvoidanceAccumulatesSmallACKs|WideWindowSendsBeyond1024Packets|SlowStartGrowsWithAcknowledgedBytes|TransferOverLossyNetwork|UDPBatchDeliversValidTailAfterSendError)$' -count=1 -timeout 120s
+        run: go test ./purego -run 'Test(CongestionAvoidanceAccumulatesSmallACKs|WideWindowSendsBeyond1024Packets|SlowStartGrowsWithAcknowledgedBytes|TransferOverLossyNetwork|UDPBatchDeliversValidTailAfterSendError|WindowAfterPropagationStep|PropagationStepRequiresFreshBidirectionalACK)$' -count=1 -timeout 120s
       - name: test -race
         run: go test ./... -count=1 -race -timeout 600s
 

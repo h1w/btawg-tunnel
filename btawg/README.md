@@ -539,6 +539,15 @@ peer and direction, not per socket. Provisional parity alone does not
 impose that limit: the receiver first needs evidence of loss.
 UDP, fragments and pure ACKs are not FEC data.
 Low-RTT paths use periodic RTT probes instead of recording each data packet.
+When both endpoints support fast path-change detection, a stable rise above
+the WAN threshold for two seconds can start loss measurement early on an
+established LAN session. Mixed versions keep the original RTT-floor schedule.
+A low RTT sample returns the path to LAN immediately. High RTT alone does
+not enable parity: the receiver still needs repeated raw loss and spare
+capacity. After a LAN baseline, if at least seven eighths of a recent round
+trip is newly added forward delay, the receiver holds back parity as it
+would for a full forward queue. This also conservatively defers repair on a
+genuinely asymmetric route change.
 The hub's authenticated `/api/traffic` endpoint aggregates `awg_recovery`
 counters over the five engines; `coded_pieces`, `recovered_packets` and
 `window_clamps` count actions, and `auto_tx_on/off` and `auto_rx_on/off`

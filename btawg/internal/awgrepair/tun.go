@@ -500,13 +500,17 @@ func (d *Device) state(p *path, now time.Time) *stream {
 	p.state = &stream{generation: p.session.generation()}
 	p.state.flight = p.preflight
 	p.preflight = flightGuard{}
-	if d.profile == autoRequest && p.session.handshakeRTT > 0 {
+	if d.profile == autoRequest {
 		a := p.state.autoState()
-		a.rttMS = a.floor.sample(now, uint16(min(p.session.handshakeRTT/time.Millisecond, 65535)))
-		a.localTX = p.session.handshakeRTT < coldMinRTT
-		a.localRX = a.localTX
-		if d.client {
-			d.localIngress.Store(a.localRX)
+		a.fastStep = p.session.peerStep
+		if p.session.handshakeRTT > 0 {
+			a.recentRTT = uint16(min(p.session.handshakeRTT/time.Millisecond, 65535))
+			a.rttMS = a.floor.sample(now, a.recentRTT, a.fastStep)
+			a.localTX = p.session.handshakeRTT < coldMinRTT
+			a.localRX = a.localTX
+			if d.client {
+				d.localIngress.Store(a.localRX)
+			}
 		}
 	}
 	if p.session.peerCold && p.session.handshakeRTT >= coldMinRTT {
@@ -599,12 +603,17 @@ func (d *Device) sent(data []byte, now time.Time) {
 					a.meter.sent(data, now, func(probe []byte) {
 						d.queueControl(p, now, func(out []byte) []byte {
 							var packet [innerMaxData]byte
-							if len(probe) > len(packet)-2 {
+							if len(probe) > len(packet)-4 {
 								return nil
 							}
 							binary.BigEndian.PutUint16(packet[:], a.rttMS)
 							copy(packet[2:], probe)
-							return p.session.send(autoSample, p.local, p.remote, packet[:2+len(probe)], out)
+							n := 2 + len(probe)
+							if a.fastStep {
+								binary.BigEndian.PutUint16(packet[n:], a.recentRTT)
+								n += 2
+							}
+							return p.session.send(autoSample, p.local, p.remote, packet[:n], out)
 						})
 					})
 				}

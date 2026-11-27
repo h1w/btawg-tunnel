@@ -27,6 +27,9 @@ func (a *autoPolicy) update(e autoEvidence, now time.Time, provisional bool) aut
 		*a = autoPolicy{}
 	}
 	a.last = now
+	if e.forwardQueue {
+		a.blockedUntil = now.Add(2 * time.Second)
+	}
 	if e.queue >= 15*time.Millisecond {
 		a.pressure = min(a.pressure+1, 8)
 	} else {
@@ -92,15 +95,17 @@ func (f *coldFlight) data(now time.Time, n int) bool {
 	return true
 }
 
-// A filled LAN queue must not turn on WAN-only work. Keep the minimum
-// of two adjacent ten-second windows so a genuine route change ages in.
+// Keep the conservative propagation floor. A train of closely spaced, stable
+// high RTT reports can retire a known LAN floor early; a lone spike cannot.
 type rttFloor struct {
-	start             time.Time
-	current, previous uint16
-	hasPrevious       bool
+	start               time.Time
+	current, previous   uint16
+	hasPrevious         bool
+	stepStart, stepLast time.Time
+	stepMin, stepMax    uint16
 }
 
-func (f *rttFloor) sample(now time.Time, ms uint16) uint16 {
+func (f *rttFloor) sample(now time.Time, ms uint16, fast bool) uint16 {
 	const period = 10 * time.Second
 	age := now.Sub(f.start)
 	switch {
@@ -112,10 +117,26 @@ func (f *rttFloor) sample(now time.Time, ms uint16) uint16 {
 	default:
 		f.current = min(f.current, ms)
 	}
+	floor := f.current
 	if f.hasPrevious {
-		return min(f.previous, f.current)
+		floor = min(f.previous, floor)
 	}
-	return f.current
+	if !fast || floor >= uint16(coldMinRTT/time.Millisecond) || ms < uint16(coldMinRTT/time.Millisecond) {
+		f.stepStart = time.Time{}
+		return floor
+	}
+	// LAN probes are scheduled at 250 ms. Do not let missing reports, a
+	// draining queue, or a growing queue count as sustained propagation.
+	lo, hi := min(ms, f.stepMin), max(ms, f.stepMax)
+	if f.stepStart.IsZero() || now.Sub(f.stepLast) > 750*time.Millisecond || hi-lo > 8 {
+		f.stepStart, lo, hi = now, ms, ms
+	}
+	f.stepLast, f.stepMin, f.stepMax = now, lo, hi
+	if now.Sub(f.stepStart) >= 2*time.Second {
+		*f = rttFloor{start: now, current: lo}
+		return lo
+	}
+	return floor
 }
 
 type autoDirection struct {
@@ -127,6 +148,8 @@ type autoDirection struct {
 	rxStamp          uint32
 	hasRXStamp       bool
 	rttMS            uint16
+	recentRTT        uint16
+	fastStep         bool
 	floor            rttFloor
 	hasStamp         bool
 	coldCap          bool
@@ -153,6 +176,11 @@ func (d *Device) autoProbe(p *path, s *stream, payload []byte, now time.Time) {
 	if len(payload) < 5 {
 		return
 	}
+	recentRTT := time.Duration(rtt) * time.Millisecond
+	if p.session.peerStep && len(payload) == 7+8*int(payload[4]) {
+		recentRTT = time.Duration(binary.BigEndian.Uint16(payload[len(payload)-2:])) * time.Millisecond
+		payload = payload[:len(payload)-2]
+	}
 	stamp := binary.BigEndian.Uint32(payload)
 	if a.hasRXStamp && int32(stamp-a.rxStamp) <= 0 {
 		return
@@ -162,6 +190,9 @@ func (d *Device) autoProbe(p *path, s *stream, payload []byte, now time.Time) {
 		return
 	}
 	a.rxStamp, a.hasRXStamp = ev.stamp, true
+	if !wan {
+		a.meter.sawLANProbe = true
+	}
 	a.localRX = !wan
 	if d.client {
 		d.localIngress.Store(a.localRX && !a.startRX.active(now) && !now.Before(s.lateUntil))
@@ -181,6 +212,12 @@ func (d *Device) autoProbe(p *path, s *stream, payload []byte, now time.Time) {
 			a.cleanStart = true
 			a.startRX.until = now
 		}
+		// A nearly full forward FIFO can have both steady RTT and fast bursts.
+		// If nearly the entire round trip is newly accrued *forward* delay
+		// above a known LAN baseline, do not add parity to that bottleneck.
+		// Cold WAN sessions have no such baseline. The delay difference uses
+		// the same two clocks as minDelta, so their absolute offset cancels.
+		ev.forwardQueue = p.session.peerStep && a.meter.sawLANProbe && recentRTT >= coldMinRTT && ev.queue*8 >= recentRTT*7
 		mode = a.rx.update(ev, now, a.startRX.active(now))
 		if mode.clamp && d.client {
 			d.localReadUntil.Store(0)
@@ -224,7 +261,8 @@ func (d *Device) autoFeedback(s *stream, payload []byte, now time.Time) {
 	}
 	a.hasStamp = true
 	a.lastStamp = stamp
-	a.rttMS = a.floor.sample(now, uint16(rtt/time.Millisecond))
+	a.recentRTT = uint16(rtt / time.Millisecond)
+	a.rttMS = a.floor.sample(now, a.recentRTT, a.fastStep)
 	a.localTX = time.Duration(a.rttMS)*time.Millisecond < coldMinRTT
 	if d.client && !a.localTX {
 		d.localReadUntil.Store(0)

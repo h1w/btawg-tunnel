@@ -11,7 +11,7 @@ func TestSlowStartGrowsWithAcknowledgedBytes(t *testing.T) {
 	s := &Socket{currentMS: 10, optSndBuf: 4 << 20}
 	c := newConn(s, nil)
 	c.maxWindow = initialWindow
-	c.applyCControl(initialWindow/2, 96_000)
+	c.applyCControl(initialWindow/2, 96_000, 0, 0)
 	if c.maxWindow != initialWindow+initialWindow/2 {
 		t.Fatalf("window after acknowledging half the flight = %d, want %d", c.maxWindow, initialWindow+initialWindow/2)
 	}
@@ -26,7 +26,7 @@ func TestCongestionAvoidanceAccumulatesSmallACKs(t *testing.T) {
 	// Each ACK adds less than one byte, but an acknowledged flight still
 	// needs to grow by almost 3000 bytes at zero queuing delay.
 	for range start / 1382 {
-		c.applyCControl(1382, 96_000)
+		c.applyCControl(1382, 96_000, 0, 0)
 	}
 	if got := c.maxWindow - start; got < 2950 || got > 3000 {
 		t.Fatalf("congestion window grew by %d bytes after one flight, want 2950–3000", got)
@@ -122,7 +122,7 @@ func TestPacedWindowRecoversOnlyWithLowQueueDelay(t *testing.T) {
 			for range len(c.ourHist.curDelayHist) {
 				c.ourHist.addSample(1_000+tt.queue, s.currentMS)
 			}
-			c.applyCControl(1_000, 120_000)
+			c.applyCControl(1_000, 120_000, 0, 0)
 			if tt.queue > 100_000 {
 				if c.maxWindow >= tt.want {
 					t.Fatalf("window = %d, want congestion backoff below %d", c.maxWindow, tt.want)
@@ -188,6 +188,106 @@ func TestCongestionBackoffKeepsOneSegmentSendable(t *testing.T) {
 			}
 			if tc.want > 0 && len(wire.take(t).payload) != tc.want {
 				t.Fatal("segment was queued but not transmitted")
+			}
+		})
+	}
+}
+
+func TestWindowAfterPropagationStep(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		outstanding bool
+		reverse     uint32
+		baseRTT     uint32
+		vary        bool
+		wantGrow    bool
+	}{
+		{"symmetric route change", false, 100_000, 0, false, true},
+		{"symmetric route change from WAN", false, 100_000, 40, false, true},
+		{"forward FIFO", false, 0, 0, false, false},
+		{"fluctuating bidirectional queue", false, 100_000, 0, true, false},
+		{"old flight has not drained", true, 100_000, 0, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Socket{currentMS: 1000, optSndBuf: 4 << 20}
+			c := newConn(s, nil)
+			c.mtuLast = 1402
+			c.slowStart = false
+			c.maxWindow, c.maxWindowUser = c.packetSize(), s.optSndBuf
+			if tc.outstanding {
+				c.curWindow = 12 * c.packetSize()
+				c.rtt = 3600 // loss backlog: ACKs for individual retransmissions can still be fast
+			} else {
+				c.rtt = tc.baseRTT + uint32((100_100+tc.reverse)/1000)
+			}
+			c.ourHist.addSample(1000, s.currentMS)
+			c.theirHist.addSample(2000, s.currentMS)
+			c.rttHist.addSample(tc.baseRTT, s.currentMS)
+			for i := range 32 {
+				s.currentMS += 200
+				jitter := uint32(0)
+				if tc.vary && i%2 == 1 {
+					jitter = 25_000
+				}
+				for range curDelaySize {
+					c.ourHist.addSample(101_100+jitter, s.currentMS)
+					c.theirHist.addSample(2000+tc.reverse+jitter, s.currentMS)
+				}
+				c.lastMaxedOutWindow = s.currentMS
+				rtt := int64(tc.baseRTT*1000 + 100_100 + tc.reverse + 2*jitter)
+				c.applyCControl(c.packetSize(), rtt, rtt, 2000+tc.reverse+jitter)
+			}
+			if grew := c.maxWindow >= 2*c.packetSize(); grew != tc.wantGrow {
+				t.Fatalf("repeated ACKs left window %d (MSS %d), want growth %v", c.maxWindow, c.packetSize(), tc.wantGrow)
+			}
+		})
+	}
+}
+
+func TestPropagationStepRequiresFreshBidirectionalACK(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		transmissions uint32
+		reverse       bool
+		wantGrow      bool
+	}{
+		{"fresh bidirectional ACK", 1, true, true},
+		{"retransmitted data", 2, true, false},
+		{"no reverse timestamp", 1, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clock := uint64(10_000_000)
+			s := &Socket{currentMS: 1_000, optSndBuf: 4 << 20}
+			c := newConn(s, nil)
+			c.state, c.mtuLast, c.slowStart = csConnected, 1402, false
+			c.maxWindow, c.maxWindowUser = c.packetSize(), s.optSndBuf
+			c.rtt = 200
+			c.rttHist.addSample(1, s.currentMS)
+			c.ourHist.addSample(1000, s.currentMS)
+			c.theirHist.addSample(2000, s.currentMS)
+			for range curDelaySize {
+				c.ourHist.addSample(101_000, s.currentMS)
+				c.theirHist.addSample(102_000, s.currentMS)
+			}
+			for i := range 16 {
+				s.currentMS += 200
+				now := clock + s.currentMS*1000
+				seq := uint16(10 + i)
+				c.seqNr, c.curWindowPackets, c.curWindow = seq+1, 1, c.packetSize()
+				pkt := &outgoingPacket{payload: c.packetSize(), transmissions: 1, timeSent: now - 200_000}
+				p := packet{h: header{Type: stState, SeqNr: 1, AckNr: seq, WndSize: 4 << 20, TimestampMicros: uint32(now - 102_000), TimestampDiffMicros: 101_000}}
+				if i >= 10 {
+					pkt.transmissions = tc.transmissions
+					if !tc.reverse {
+						p.h.TimestampMicros = 0
+					}
+				}
+				c.outbuf.put(uint32(seq), pkt)
+				c.lastMaxedOutWindow = s.currentMS
+				c.processIncoming(&p, false, now)
+			}
+			if grew := c.maxWindow >= 2*c.packetSize(); grew != tc.wantGrow {
+				t.Fatalf("window = %d, want growth %v", c.maxWindow, tc.wantGrow)
 			}
 		})
 	}

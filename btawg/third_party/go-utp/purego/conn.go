@@ -215,6 +215,7 @@ type Conn struct {
 
 	ourHist   delayHist
 	theirHist delayHist
+	step      propagationStep
 	// The extension bits the peer advertised in its SYN. libutp records these and leaves them to
 	// the application; nothing in the protocol proper reads them.
 	extensions [8]byte
@@ -688,9 +689,8 @@ func (c *Conn) ackPacket(seq uint16, now uint64) int {
 	return 0
 }
 
-// Counts the bytes acked by a selective ack header, and folds the round trip times of those
-// packets into minRTT.
-func (c *Conn) selectiveAckBytes(base uint32, mask []byte, minRTT *int64, now uint64) int {
+// Counts selectively acknowledged bytes and collects ACK timing samples.
+func (c *Conn) selectiveAckBytes(base uint32, mask []byte, timing *ackTiming, now uint64) int {
 	if c.curWindowPackets == 0 {
 		return 0
 	}
@@ -709,15 +709,26 @@ func (c *Conn) selectiveAckBytes(base uint32, mask []byte, minRTT *int64, now ui
 		}
 		if bits >= 0 && mask[bits>>3]&(1<<(bits&7)) != 0 {
 			ackedBytes += pkt.payload
-			// Guard against a clock that isn't monotonic.
-			if pkt.timeSent < now {
-				*minRTT = min(*minRTT, int64(now-pkt.timeSent))
-			} else {
-				*minRTT = min(*minRTT, 50000)
-			}
+			timing.add(pkt, now)
 		}
 	}
 	return ackedBytes
+}
+
+type ackTiming struct {
+	minRTT, freshRTT int64
+}
+
+func (a *ackTiming) add(pkt *outgoingPacket, now uint64) {
+	// Preserve the existing LEDBAT clamp, including timing from retries.
+	rtt := int64(50_000)
+	if pkt.timeSent < now {
+		rtt = int64(now - pkt.timeSent)
+		if pkt.transmissions == 1 && (a.freshRTT == 0 || rtt < a.freshRTT) {
+			a.freshRTT = rtt
+		}
+	}
+	a.minRTT = min(a.minRTT, rtt)
 }
 
 // The largest number of resends one selective ack may schedule.
@@ -809,13 +820,25 @@ func (c *Conn) selectiveAck(base uint32, mask []byte, now uint64) {
 
 // LEDBAT. Grows the window towards a fixed target queuing delay, so that a uTP transfer yields to
 // anything else sharing the bottleneck rather than filling the buffer in front of it.
-func (c *Conn) applyCControl(bytesAcked int, minRTT int64) {
+func (c *Conn) applyCControl(bytesAcked int, minRTT, freshRTT int64, reverseDelay uint32) {
 	// The delay can never exceed the round trip time it was measured over.
 	ourDelay := int32(min(uint64(c.ourHist.value()), uint64(minRTT)))
 
 	target := c.targetDelay
 	if target <= 0 {
 		target = defaultTargetDelay
+	}
+	// Below two segments there is little self-induced queue to drain. Only
+	// reconsider a stale base on fresh timed ACKs, never on timer ticks.
+	if freshRTT > 0 && reverseDelay != 0 && c.rttHist.initialized && c.maxWindow <= 2*c.packetSize() && c.curWindow <= c.maxWindow && ourDelay >= int32(target-target/10) {
+		base := int64(c.rttHist.delayBase) * 1000
+		reverse := min(c.theirHist.value(), reverseDelay-c.theirHist.delayBase)
+		if shift := c.step.observe(c.s.currentMS, uint32(ourDelay), reverse, freshRTT-base, int64(c.rtt)*1000-base); shift != 0 {
+			c.ourHist.shift(shift)
+			ourDelay -= int32(shift)
+		}
+	} else {
+		c.step.start = 0
 	}
 
 	// Compensate for large clock drift, which otherwise hands one end an unfair share of the
@@ -1084,7 +1107,7 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 	ackedBytes := 0
 	// The smallest round trip time across everything this packet acked. It's the upper bound on
 	// the delay the peer can report back to us.
-	minRTT := int64(math.MaxInt64)
+	timing := ackTiming{minRTT: math.MaxInt64}
 
 	for i := 0; i < acks; i++ {
 		seq := (c.seqNr - c.curWindowPackets + uint16(i)) & ackNrMask
@@ -1093,14 +1116,10 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 			continue
 		}
 		ackedBytes += pkt.payload
-		if pkt.timeSent < now {
-			minRTT = min(minRTT, int64(now-pkt.timeSent))
-		} else {
-			minRTT = min(minRTT, 50000)
-		}
+		timing.add(pkt, now)
 	}
 	if p.selAck != nil {
-		ackedBytes += c.selectiveAckBytes((uint32(pkAckNr)+2)&ackNrMask, p.selAck, &minRTT, now)
+		ackedBytes += c.selectiveAckBytes((uint32(pkAckNr)+2)&ackNrMask, p.selAck, &timing, now)
 	}
 
 	c.lastMeasuredDelay = currentMS
@@ -1137,13 +1156,13 @@ func (c *Conn) processIncoming(p *packet, syn bool, now uint64) {
 
 	// If the delay estimate exceeds the round trip time it was measured over, it's wrong; move
 	// the base to make it fit.
-	if int64(c.ourHist.value()) > minRTT {
-		c.ourHist.shift(uint32(int64(c.ourHist.value()) - minRTT))
+	if int64(c.ourHist.value()) > timing.minRTT {
+		c.ourHist.shift(uint32(int64(c.ourHist.value()) - timing.minRTT))
 	}
 
 	// Congestion control only runs on acks, and only when there's a delay measurement to run it on.
 	if actualDelay != 0 && ackedBytes >= 1 {
-		c.applyCControl(ackedBytes, minRTT)
+		c.applyCControl(ackedBytes, timing.minRTT, timing.freshRTT, theirDelay)
 	}
 
 	previousWindow := c.maxWindowUser

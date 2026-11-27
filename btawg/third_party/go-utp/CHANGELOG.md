@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- btawg vendor patch: when a live route's delay rises in both directions,
+  fresh ACKs for non-retransmitted data with a reverse timestamp and a
+  matching RTT increase can retire part of the old forward delay baseline
+  at a nearly collapsed window. A forward-only delay rise does not qualify;
+  ordinary loss backoff and receive credit are unchanged.
 - btawg vendor patch: synchronize timeout timer initialization with the callback
   to prevent a race during socket startup.
 - btawg vendor patch: selective acknowledgements for later packets no longer
