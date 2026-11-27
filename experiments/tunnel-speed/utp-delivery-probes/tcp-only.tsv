@@ -1,0 +1,5 @@
+profile	seed	cubic_only_mbps	total_fifo_drops
+late	47011	0.91	0
+late	47032	0.5630000000000001	0
+shared	47011	0.853	0
+shared	47032	0.663	0

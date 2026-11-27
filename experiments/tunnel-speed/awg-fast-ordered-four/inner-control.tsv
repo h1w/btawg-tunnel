@@ -1,0 +1,5 @@
+mode	arm	case	seed	clean4_mbps	first10_mbps	late10_mbps	whole_post_mbps	zero_seconds	measured_seconds	first_grant_s	tx_grants	rx_grants	coded_hub	recovered_hub	samples_hub	missing_hub	clamps_hub	control_bytes	pre_tx_grants	pre_rx_grants	pre_coded	pre_recovered	absolute_tx	absolute_rx	absolute_coded	absolute_recovered	engine_drops	idle_rtt_ms	loaded_underlay_p50_ms	loaded_underlay_p95_ms	backlog_p50_bytes	drops_down	drops_up	inject_logged_at_least
+ext-tcp	inner	inner-up	none		24.573	25.8537	25.6777	0	44	0.955	0	1	0	1161	34679	366	44560	70088	0	0	0	0	0	1	0	1161	0	100.246	100.0	100.0		0	0	1100
+ext-utp	inner	inner-up	none		24.9825	26.0826	25.8358	0	44	0.721	0	1	0	1175	34604	342	48021	69592	0	0	0	0	0	1	0	1175	0	100.204	100.0	100.0		0	0	1100
+req-tcp	inner	inner-up	none		24.622	26.0618	25.7254	0	44	0.943	0	1	0	1166	34610	341	43551	69964	0	0	0	0	0	1	0	1166	0	100.213	100.0	100.0		0	0	1100
+req-utp	inner	inner-up	none		25.0732	26.0876	25.8475	0	44	0.701	0	1	0	1170	34658	347	50707	69716	0	0	0	0	0	1	0	1170	0	100.176	100.0	100.0		0	0	1100

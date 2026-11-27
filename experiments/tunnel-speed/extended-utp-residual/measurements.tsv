@@ -1,0 +1,59 @@
+trial	pace_mbps	arm	profile	seed	post_mbps	late_mbps	zero_s	longest_zero_s	hub_cwnd_B	hub_rwnd_B	hub_forward_us	hub_reverse_us	hub_rto_events	underlay_p95_ms	wan_down_drops	wan_up_drops	separate_fifo_drops	hub_coded_pieces	cross_receiver
+base.47011	0	baseline	wan	47011	1.9669	0.7042	4	3						200.0	113	20		0	
+base.47032	0	baseline	wan	47032	1.7109	0.4028	11	4						200.0	160	19		0	
+capacity.baseline	50	baseline	capacity	47032	1.3379	1.1573	6	5						202.0	155	70	0	0	[  4]   0.00-16.20  sec  1.25 MBytes   647 Kbits/sec                  receiver
+capacity.optin	50	optin	capacity	47032	1.2329	1.0806	1	1						201.0	118	51	0	0	[  4]   0.00-16.20  sec  1.75 MBytes   906 Kbits/sec                  receiver
+clean50	50	baseline	clean	0	22.0118	27.6278	3	3						0.107	0	0		0	
+cleanbase	0	baseline	clean	0	328.4829	328.1382	0	0						0.076	0	0		0	
+clocked.wan.47011	50	clocked	wan	47011	4.1318	4.3157	0	0						200.0	265	82		0	
+clocked.wan.47032	50	clocked	wan	47032	3.6832	3.9149	1	1						200.0	254	80		0	
+cold50.47011	50	baseline	cold	47011	17.4128	19.5396	0	0						200.0	1331	570		0	
+cold50.47032	50	baseline	cold	47032	18.077	20.0584	0	0						200.0	1298	453		0	
+coldbase.47011	0	baseline	cold	47011	0.6993	0.8045	0	0						200.0	58	31		0	
+coldbase.47032	0	baseline	cold	47032	0.7855	0.7427	0	0						200.0	71	24		0	
+delay-only.wan.47011	50	delay-only	wan	47011	2.0931	1.7318	0	0						200.0	143	50		0	
+delay-only.wan.47032	50	delay-only	wan	47032	1.8247	1.342	0	0						200.0	167	48		0	
+droptrace.wan.47011	0	droptrace	wan	47011	2.0284	0.4765	3	1	14162.0	25165824.0	50061.5	100135.5	2	200.0	206	27		0	
+droptrace.wan.47032	0	droptrace	wan	47032	2.1652	0.2191	9	3	9411.5	25165824.0	50094.5	100178.5	3	200.0	193	19		0	
+early.47011	0	early	wan	47011	1.9232	0.5737	5	2						200.0	120	20		0	
+early.47032	0	early	wan	47032	1.7807	0.5698	14	4						200.0	133	19		0	
+early50.47011	50	early	wan	47011	1.8037	1.6729	0	0						200.0	126	44		0	
+early50.47032	50	early	wan	47032	1.5599	1.4038	0	0						200.0	146	42		0	
+fifo50	50	baseline	fifo-share	47011	22.1596	25.161	1	1						0.097	0	0		0	[  4]   0.00-36.00  sec   236 MBytes  55.0 Mbits/sec  0.030 ms  0/206252 (0%)  receiver
+fifobase	0	baseline	fifo-share	47011	38.4194	40.4302	0	0						117.0	3996	0		0	[  4]   0.00-36.09  sec   236 MBytes  54.9 Mbits/sec  0.083 ms  3/206256 (0.0015%)  receiver
+fifostep50	50	paced-step	fifo-share	47011	21.9081	24.795	3	2						0.098	0	0		0	[  4]   0.00-36.00  sec   236 MBytes  55.0 Mbits/sec  0.020 ms  0/206251 (0%)  receiver
+final.47011	50	optin	wan	47011	3.549	2.6966	0	0						200.0	271	78		0	
+final.47032	50	optin	wan	47032	15.0999	16.7391	0	0						200.0	1030	278		0	
+final.clean	50	optin	clean	0	21.8779	27.7576	4	4						0.104	0	0		0	
+final.duplex	50	optin	fifo-duplex	47011	1.6096	0.0079	27	22						240.0	25695	23140		0	[  4][TX-C]   0.00-36.12  sec   414 MBytes  96.1 Mbits/sec  0.049 ms  24700/386252 (6.4%)  receiver; [  6][RX-C]   0.00-36.12  sec   414 MBytes  96.2 Mbits/sec  0.049 ms  22965/384973 (6%)  receiver
+oneside.47032	50	oneside	wan	47032	12.3084	17.2407	0	0						200.0	853	232		0	
+pace200.47011	200	baseline	wan	47011	2.2921	1.3213	2	1						200.0	187	41		0	
+pace200.47032	200	baseline	wan	47032	1.6192	1.4363	2	1						200.0	154	27		0	
+pace50.47011	50	baseline	wan	47011	1.6044	1.0453	0	0						200.0	115	41		0	
+pace50.47032	50	baseline	wan	47032	1.4958	1.4717	1	1						200.0	141	42		0	
+prebase.47011	0	baseline	prewan	47011	2.2187	0.9636	2	2						200.0	203	57		0	
+prebase.47032	0	baseline	prewan	47032	1.6945	0.6219	6	5						200.0	209	44		0	
+prepace50.47011	50	baseline	prewan	47011	19.4226	18.8897	0	0						200.0	1312	505		0	
+prepace50.47032	50	baseline	prewan	47032	19.0389	23.1353	0	0						200.0	1284	463		0	
+rtt.wan.47011	0	rtt	wan	47011	3.1075	0.2456	1	1						200.0	257	31		0	
+rtt.wan.47032	0	rtt	wan	47032	1.2738	0.3674	6	1						200.0	217	20		0	
+rttbase-only.wan.47011	50	rttbase-only	wan	47011	15.5196	19.0273	0	0						200.0	1009	273		0	
+rttbase-only.wan.47032	50	rttbase-only	wan	47032	12.1586	20.8054	1	1						200.0	830	238		0	
+shared.clocked.47011	50	clocked	shared	47011	0.0977	0.0914	1	1						200.0	50	31	1714	0	[  4]   0.00-33.20  sec  3.62 MBytes   916 Kbits/sec                  receiver
+shared.clocked.47032	50	clocked	shared	47032	2.911	3.2851	0	0						214.0	226	107	1705	0	[  4]   0.00-33.20  sec  2.12 MBytes   537 Kbits/sec                  receiver
+shared.delay.47011	50	delay-only	shared	47011	0.0936	0.0982	1	1						200.0	45	29	1645	0	[  4]   0.00-33.20  sec  3.00 MBytes   758 Kbits/sec                  receiver
+shared.delay.47032	50	delay-only	shared	47032	1.517	1.4225	0	0						204.0	160	85	1582	0	[  4]   0.00-33.20  sec  4.88 MBytes  1.23 Mbits/sec                  receiver
+shared.final.47011	50	optin	shared	47011	0.0957	0.1031	0	0						200.0	50	35	1639	0	[  4]   0.00-33.20  sec  3.62 MBytes   916 Kbits/sec                  receiver
+shared.final.47032	50	optin	shared	47032	0.0897	0.0855	2	1						200.0	42	22	1532	0	[  4]   0.00-33.20  sec  3.12 MBytes   790 Kbits/sec                  receiver
+shared.final.repeat	50	optin	shared	47032	2.2063	2.3745	12	3						225.0	247	116	21796	0	[  4]   0.00-33.20  sec  2.00 MBytes   505 Kbits/sec                  receiver
+shared.pace.47011	50	baseline	shared	47011	1.825	1.7163	0	0						205.0	133	78	1772	0	[  4]   0.00-33.20  sec  3.00 MBytes   758 Kbits/sec                  receiver
+shared.pace.47032	50	baseline	shared	47032	0.0962	0.0943	2	1						200.0	59	39	1576	0	[  4]   0.00-33.20  sec  4.88 MBytes  1.23 Mbits/sec                  receiver
+shared.rttbase.47011	50	rttbase-only	shared	47011	0.0957	0.0943	0	0						200.0	46	31	1630	0	[  4]   0.00-33.20  sec  3.12 MBytes   790 Kbits/sec                  receiver
+shared.rttbase.47032	50	rttbase-only	shared	47032	0.0923	0.0815	1	1						200.0	65	42	1625	0	[  4]   0.00-33.20  sec  5.25 MBytes  1.33 Mbits/sec                  receiver
+shared.step.47011	50	paced-step	shared	47011	2.6659	1.5149	10	4						225.0	264	133	28136	0	[  4]   0.00-33.20  sec   640 KBytes   158 Kbits/sec                  receiver
+shared.step.47032	50	paced-step	shared	47032	3.2183	3.0091	5	1						225.0	335	148	28979	0	[  4]   0.00-33.23  sec  1.62 MBytes   410 Kbits/sec                  receiver
+shared.unpaced	0	baseline	shared	47011	0.0321	0.0314	22	19						200.0	56	35	14806	0	[  4]   0.00-33.20  sec  4.25 MBytes  1.07 Mbits/sec                  receiver
+step50.47011	50	paced-step	wan	47011	18.5674	17.4308	0	0						200.0	1173	321		0	
+step50.47032	50	paced-step	wan	47032	14.7109	16.6497	0	0						200.0	938	264		0	
+trace.ok.47011	0	trace	wan	47011	2.3278	0.0	33	18	2904.5	25165824.0	100117.5	100167.0	2	200.0	249	29		0	
+trace.wan.47032	0	trace	wan	47032	1.8099	0.5737	16	13	13444.0	25165824.0	50055.5	100147.0	2	200.0	226	20		0	

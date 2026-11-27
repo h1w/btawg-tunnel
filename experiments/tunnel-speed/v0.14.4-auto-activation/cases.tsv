@@ -1,0 +1,8 @@
+case	data_start_rel_change_s	first_measured_postchange_10s_mbps	last_10s_mbps	first_coded_rel_change_s	first_grant_rel_change_s	grants	withdrawals	coded_pieces	netem_drops_down	netem_drops_up
+cold	2.385	67.75	82.473	2.595	3.594	1	0	266304	8210	2439
+warm	1.724	10.122	82.503	21.208	21.208	1	0	164668	5195	1593
+live	-5.024	8.159	75.652	16.087	16.087	1	0	113236	3621	1127
+wanloss	-5.035	74.106	81.894	-4.83	2.924	1	0	126916	4304	1248
+lanloss	-5.03	457.478	482.385			0	0	0	16853	7369
+diag	1.722	8.502	75.6	20.729	20.729	1	0	44104	1479	487
+short	1.695	20.068	81.345	3.946	3.946	1	0	109708	3410	1043
