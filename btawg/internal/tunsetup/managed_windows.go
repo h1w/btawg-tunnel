@@ -16,10 +16,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 	"golang.zx2c4.com/wintun"
 )
 
@@ -44,22 +44,29 @@ func adapterIdentity(row windows.MibIfRow2) WindowsAdapterIdentity {
 	}
 }
 
-// A stale IP Helper row can outlive the Wintun device instance. Require the
-// corresponding SWD\Wintun device key before treating a GUID as a live adapter.
-func wintunDeviceRegistered(guid windows.GUID) (bool, error) {
-	path := `SYSTEM\CurrentControlSet\Enum\SWD\Wintun\` + strings.ToUpper(guid.String())
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
-	if errors.Is(err, registry.ErrNotExist) {
-		return false, nil
-	}
+var locateDeviceNode = windows.NewLazySystemDLL("cfgmgr32.dll").NewProc("CM_Locate_DevNodeW")
+
+// Both the IP Helper row and registry key can outlive a Wintun device after
+// an unclean shutdown. A normal PnP lookup excludes these phantom devices.
+func wintunDevicePresent(guid windows.GUID) (bool, error) {
+	id, err := windows.UTF16PtrFromString(`SWD\Wintun\` + guid.String())
 	if err != nil {
 		return false, err
 	}
-	_ = key.Close()
-	return true, nil
+	var node windows.DEVINST
+	const locateNormal = 0 // CM_LOCATE_DEVNODE_NORMAL
+	result, _, _ := locateDeviceNode.Call(uintptr(unsafe.Pointer(&node)), uintptr(unsafe.Pointer(id)), locateNormal)
+	switch status := windows.CONFIGRET(result); status {
+	case windows.CR_SUCCESS:
+		return true, nil
+	case windows.CR_NO_SUCH_DEVNODE:
+		return false, nil
+	default:
+		return false, fmt.Errorf("locate Wintun device %s: %w", guid, status)
+	}
 }
 
-// FindWindowsAdapterIdentity returns a registered Wintun device by alias.
+// FindWindowsAdapterIdentity returns a present Wintun device by alias.
 // Its absence does not authorize modifying any other adapter with that alias.
 func FindWindowsAdapterIdentity(alias string) (WindowsAdapterIdentity, bool, error) {
 	row, err := findWindowsAdapter(alias)
@@ -70,21 +77,21 @@ func FindWindowsAdapterIdentity(alias string) (WindowsAdapterIdentity, bool, err
 	if !strings.Contains(description, "wintun") && !strings.Contains(description, "btawg") {
 		return WindowsAdapterIdentity{}, false, nil
 	}
-	registered, err := wintunDeviceRegistered(row.InterfaceGuid)
-	if err != nil || !registered {
+	present, err := wintunDevicePresent(row.InterfaceGuid)
+	if err != nil || !present {
 		return WindowsAdapterIdentity{}, false, err
 	}
 	return adapterIdentity(row), true, nil
 }
 
 // AdapterIdentityPresent checks the adapter instance by GUID/LUID and live PnP
-// registration. The alias may be foreign or stale and is not consulted.
+// presence. The alias may be foreign or stale and is not consulted.
 func AdapterIdentityPresent(id WindowsAdapterIdentity) (bool, error) {
 	if id.LUID == 0 {
 		return false, nil
 	}
-	registered, err := wintunDeviceRegistered(id.GUID)
-	if err != nil || !registered {
+	present, err := wintunDevicePresent(id.GUID)
+	if err != nil || !present {
 		return false, err
 	}
 	row, err := findWindowsAdapterByGUID(id.GUID)
@@ -144,10 +151,13 @@ func waitForAliasReleased(name string) error {
 		if err != nil || row.InterfaceLuid == 0 {
 			return err
 		}
-		if !strings.EqualFold(windows.UTF16ToString(row.Description[:]), "btawg Tunnel") {
+		// Windows adds a numeric suffix when Wintun creates another adapter
+		// with the same device description, including after a crash.
+		description, _, _ := strings.Cut(windows.UTF16ToString(row.Description[:]), " #")
+		if !strings.EqualFold(description, "btawg Tunnel") {
 			return fmt.Errorf("interface %q is already in use", name)
 		}
-		live, err := wintunDeviceRegistered(row.InterfaceGuid)
+		live, err := wintunDevicePresent(row.InterfaceGuid)
 		if err != nil || !live {
 			return err
 		}

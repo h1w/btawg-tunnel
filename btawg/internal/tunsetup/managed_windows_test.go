@@ -157,6 +157,40 @@ func TestWindowsClientTUNRejectsForeignState(t *testing.T) {
 	}
 }
 
+func TestWindowsClientTUNIgnoresPhantomAdapter(t *testing.T) {
+	windowsTUNFixture(t)
+	name := os.Getenv("BTAWG_WINDOWS_PHANTOM_ADAPTER")
+	if name == "" {
+		t.Skip("requires a phantom Wintun adapter left by an unclean shutdown")
+	}
+	stale, err := findWindowsAdapter(name)
+	if err != nil || stale.InterfaceLuid == 0 {
+		t.Fatalf("phantom fixture %q missing from IP Helper: %v", name, err)
+	}
+	// The isolated fixture has no running client or other owner of this alias.
+	// Use an unrelated prefix so an unexpected overlap does not mask the alias check.
+	dev, err := OpenClientTUN(name, netip.MustParsePrefix("10.179.23.2/24"), nil, 1280)
+	if err != nil {
+		t.Fatalf("start over phantom adapter %q: %v", name, err)
+	}
+	t.Cleanup(func() {
+		if err := dev.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, ok, err := FindWindowsAdapterIdentity(name)
+	if err != nil || !ok || current.GUID == stale.InterfaceGuid {
+		t.Fatalf("no new device for %q: %v", name, err)
+	}
+	if routes := routesOn(t, iface.Index); !slices.Contains(routes, netip.MustParsePrefix("10.179.23.0/24")) {
+		t.Fatalf("replacement adapter lacks its VPN route: %v", routes)
+	}
+}
+
 func windowsTUNFixture(t *testing.T) {
 	t.Helper()
 	if os.Getenv("BTAWG_WINDOWS_NETWORK_TESTS") != "1" {

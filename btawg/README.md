@@ -223,6 +223,10 @@ starting the real-TUN client. The TUI, SOCKS5 ports, balance pools and peer
 menus are shared with Linux. **View service logs** shows the Windows Application
 event log entries for `btawg-client`.
 
+If Windows retains a non-present Wintun device after an unclean shutdown, the
+client ignores that stale adapter record on startup. A live adapter with the
+same name is still a conflict.
+
 Windows carrier sockets keep their selected physical interface between route
 changes; btawg revalidates the selection when Windows reports network changes.
 The userspace SOCKS packet pump waits when its transport queue is full. If
